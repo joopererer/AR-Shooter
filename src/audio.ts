@@ -585,16 +585,19 @@ export class AudioManager {
   }
 
   /**
-   * 猎犬高举战利品欢快胜利小号声 (Fanfare)
+   * 猎犬高举战利品欢快胜利小号声 (Triumphant NES Victory Fanfare)
+   * 经典 6 音阶欢庆军号 (C5 - E5 - G5 - C6 - G5 - C6 持续强音)，与嘲笑声截然不同
    */
   public playNesDogCatch(): void {
     if (!this.isEnabled || !this.ctx) return;
     try {
       const notes = [
-        { f: 587.33, d: 0.08 }, // D5
-        { f: 739.99, d: 0.08 }, // F#5
-        { f: 880.0, d: 0.08 },  // A5
-        { f: 1174.66, d: 0.28 },// D6
+        { f: 523.25, d: 0.09 }, // C5
+        { f: 659.25, d: 0.09 }, // E5
+        { f: 783.99, d: 0.09 }, // G5
+        { f: 1046.5, d: 0.14 }, // C6
+        { f: 783.99, d: 0.09 }, // G5
+        { f: 1046.5, d: 0.38 }, // C6 (高亢延长胜利音)
       ];
       let t = this.ctx.currentTime;
       notes.forEach((n) => {
@@ -604,7 +607,7 @@ export class AudioManager {
         osc.type = 'square';
         osc.frequency.setValueAtTime(n.f, t);
 
-        gain.gain.setValueAtTime(0.24, t);
+        gain.gain.setValueAtTime(0.28, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
 
         osc.connect(gain);

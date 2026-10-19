@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three';
+import { TextureGenerator } from './textureGenerator';
 
 export interface ObstacleEntity {
   id: string;
@@ -37,6 +38,7 @@ export class EnvironmentManager {
   // 环境组件
   private groundMesh: THREE.Mesh | null = null;
   private streamMesh: THREE.Mesh | null = null;
+  private waterTexture: THREE.CanvasTexture | null = null;
   private streamTime: number = 0;
   private obstacles: ObstacleEntity[] = [];
 
@@ -92,36 +94,40 @@ export class EnvironmentManager {
   }
 
   /**
-   * 构造 360° 环绕玩家流淌的自然溪流与两岸鹅卵石
+   * 构造 360° 环绕玩家流淌的高仿真动态溪流与两岸鹅卵石
    */
   private build360CircularStream(): void {
-    const segments = 48;
+    const segments = 64;
     const innerRadius = 6.8;
-    const outerRadius = 9.2;
-    const streamGeo = new THREE.RingGeometry(innerRadius, outerRadius, segments, 3);
+    const outerRadius = 9.4;
+    const streamGeo = new THREE.RingGeometry(innerRadius, outerRadius, segments, 4);
     const pos = streamGeo.attributes.position;
 
-    // 让溪流环边缘产生天然弯曲起伏正弦形态
+    // 让溪流环边缘产生天然弯曲起伏正弦形态与多重波纹
     for (let i = 0; i < pos.count; i++) {
       const u = pos.getX(i);
       const v = pos.getY(i);
       const angle = Math.atan2(v, u);
       const rad = Math.hypot(u, v);
-      const wobble = Math.sin(angle * 6.0) * 0.45;
+      const wobble = Math.sin(angle * 5.0) * 0.42 + Math.cos(angle * 11.0) * 0.18;
       const newRad = rad + wobble;
       pos.setX(i, Math.cos(angle) * newRad);
       pos.setY(i, Math.sin(angle) * newRad);
     }
     streamGeo.computeVertexNormals();
 
+    this.waterTexture = TextureGenerator.getWaterTexture();
+
     const streamMat = new THREE.MeshStandardMaterial({
-      color: 0x00b4d8,
+      map: this.waterTexture,
+      emissiveMap: this.waterTexture,
+      color: 0x38bdf8,
       transparent: true,
-      opacity: 0.6,
-      roughness: 0.1,
-      metalness: 0.6,
-      emissive: 0x0077b6,
-      emissiveIntensity: 0.3,
+      opacity: 0.82,
+      roughness: 0.15,
+      metalness: 0.4,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.45,
       depthWrite: false,
     });
 
@@ -130,14 +136,21 @@ export class EnvironmentManager {
     this.streamMesh.position.set(0, -1.48, 0);
     this.rootGroup.add(this.streamMesh);
 
-    // 沿 360 度溪流环两侧布置 24 块鹅卵石
-    for (let i = 0; i < 24; i++) {
-      const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-      const pebbleRad = (Math.random() > 0.5 ? innerRadius - 0.25 : outerRadius + 0.25) + (Math.random() - 0.5) * 0.3;
-      const pebbleGeo = new THREE.DodecahedronGeometry(0.14 + Math.random() * 0.18, 0);
-      const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 });
+    // 沿 360 度溪流环两侧布置 32 块不同大小的天然鹅卵石与苔藓石
+    for (let i = 0; i < 32; i++) {
+      const angle = (i / 32) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+      const isInner = Math.random() > 0.45;
+      const pebbleRad = (isInner ? innerRadius - 0.35 : outerRadius + 0.35) + (Math.random() - 0.5) * 0.4;
+      const pebbleGeo = new THREE.DodecahedronGeometry(0.12 + Math.random() * 0.22, 1);
+      pebbleGeo.scale(1.2, 0.7, 1.0);
+      const isMossy = Math.random() > 0.5;
+      const pebbleMat = new THREE.MeshStandardMaterial({
+        color: isMossy ? 0x475569 : 0x64748b,
+        roughness: 0.88,
+      });
       const pebble = new THREE.Mesh(pebbleGeo, pebbleMat);
-      pebble.position.set(Math.cos(angle) * pebbleRad, -1.46, Math.sin(angle) * pebbleRad);
+      pebble.position.set(Math.cos(angle) * pebbleRad, -1.45, Math.sin(angle) * pebbleRad);
+      pebble.rotation.set(Math.random(), Math.random(), Math.random());
       this.rootGroup.add(pebble);
     }
   }
@@ -177,40 +190,80 @@ export class EnvironmentManager {
       const colliders: THREE.Mesh[] = [];
 
       if (cfg.type === 'tree') {
-        // 低多边形高大松树
-        const trunkGeo = new THREE.CylinderGeometry(0.32, 0.52, 3.2, 7);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.9 });
+        // 高仿真林中高大松树：真实树皮纹理树干 + 隆起树根 + 多层繁茂墨绿针叶松冠
+        const barkTex = TextureGenerator.getTreeBarkTexture();
+        const trunkGeo = new THREE.CylinderGeometry(0.3, 0.58, 3.4, 8);
+        const trunkMat = new THREE.MeshStandardMaterial({
+          map: barkTex,
+          roughness: 0.88,
+          metalness: 0.05,
+        });
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 1.6;
+        trunk.position.y = 1.7;
         group.add(trunk);
         colliders.push(trunk);
 
-        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x1b4332, roughness: 0.7, flatShading: true });
-        for (let l = 0; l < 3; l++) {
-          const cone = new THREE.Mesh(new THREE.ConeGeometry(1.6 - l * 0.35, 1.8, 6), foliageMat);
-          cone.position.y = 2.8 + l * 1.0;
+        // 树根向四周外扩抓地
+        const rootGeo = new THREE.ConeGeometry(0.85, 0.6, 7);
+        const root = new THREE.Mesh(rootGeo, trunkMat);
+        root.position.y = 0.3;
+        group.add(root);
+
+        // 4 层层叠渐进针叶松冠
+        const foliageColors = [0x143625, 0x1b4332, 0x2d6a4f, 0x40916c];
+        for (let l = 0; l < 4; l++) {
+          const foliageMat = new THREE.MeshStandardMaterial({
+            color: foliageColors[l],
+            roughness: 0.75,
+            flatShading: true,
+          });
+          const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(1.8 - l * 0.38, 1.6, 7),
+            foliageMat
+          );
+          cone.position.y = 2.6 + l * 0.95;
+          cone.rotation.y = l * 0.45;
           group.add(cone);
           colliders.push(cone);
         }
       } else if (cfg.type === 'rock') {
         // 青灰色花岗岩巨石
-        const rockGeo = new THREE.DodecahedronGeometry(1.25 + Math.random() * 0.3, 1);
-        rockGeo.scale(1.3, 0.95, 1.1);
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x5a6577, roughness: 0.85, metalness: 0.1, flatShading: true });
+        const rockGeo = new THREE.DodecahedronGeometry(1.3 + Math.random() * 0.35, 1);
+        rockGeo.scale(1.35, 0.9, 1.15);
+        const rockMat = new THREE.MeshStandardMaterial({
+          color: 0x526071,
+          roughness: 0.85,
+          metalness: 0.12,
+          flatShading: true,
+        });
         const rock = new THREE.Mesh(rockGeo, rockMat);
-        rock.position.y = 0.9;
-        rock.rotation.set(Math.random(), Math.random(), Math.random());
+        rock.position.y = 0.95;
+        rock.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, Math.random() * 0.3);
         group.add(rock);
         colliders.push(rock);
       } else {
-        // 茂密低矮灌木
-        const bushGeo = new THREE.IcosahedronGeometry(1.0, 1);
-        bushGeo.scale(1.4, 0.85, 1.3);
-        const bushMat = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.8, flatShading: true });
-        const bush = new THREE.Mesh(bushGeo, bushMat);
-        bush.position.y = 0.65;
-        group.add(bush);
-        colliders.push(bush);
+        // 茂密低矮浆果灌木
+        const bushGroup = new THREE.Group();
+        const bushMat = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.82, flatShading: true });
+        const berryMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.3 }); // 鲜红野生浆果
+
+        const bushMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1.05, 1), bushMat);
+        bushMesh.scale.set(1.4, 0.85, 1.3);
+        bushMesh.position.y = 0.65;
+        bushGroup.add(bushMesh);
+        colliders.push(bushMesh);
+
+        // 鲜红浆果点缀
+        for (let b = 0; b < 6; b++) {
+          const berry = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 5), berryMat);
+          berry.position.set(
+            (Math.random() - 0.5) * 1.1,
+            0.65 + Math.random() * 0.45,
+            (Math.random() - 0.5) * 1.1
+          );
+          bushGroup.add(berry);
+        }
+        group.add(bushGroup);
       }
 
       const hp = cfg.type === 'rock' ? 3 : cfg.type === 'tree' ? 4 : 1;
@@ -860,10 +913,14 @@ export class EnvironmentManager {
     this.streamTime += delta;
     this.ghostFireTime += delta;
 
-    // 1. 溪流流光波纹微动动画
+    // 1. 溪流流光波纹微动与水纹偏移流淌动画
     if (this.streamMesh) {
-      const wave = Math.sin(this.streamTime * 2.0) * 0.05;
-      (this.streamMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + wave;
+      const wave = Math.sin(this.streamTime * 2.0) * 0.08;
+      (this.streamMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4 + wave;
+      if (this.waterTexture) {
+        this.waterTexture.offset.x += delta * 0.035;
+        this.waterTexture.offset.y += delta * 0.018;
+      }
     }
 
     // 2. 超空间光速粒子雨 (Warp Speed Star Streaks) 更新
@@ -972,6 +1029,7 @@ export class EnvironmentManager {
     this.sparkParticles = [];
     this.groundMesh = null;
     this.streamMesh = null;
+    this.waterTexture = null;
     this.warpStars = null;
     this.warpPositions = null;
     this.warpVelocities = null;

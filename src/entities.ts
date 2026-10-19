@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { GameMode } from './modes';
+import { TextureGenerator } from './textureGenerator';
 
 export type EntityType =
   | 'deer'
@@ -391,58 +392,108 @@ export class EntityManager {
    * 1. 逼真野鹿 (Deer)：多段优雅躯干、多叉鹿角、白色腹部条纹与修长四肢
    */
   private buildDeerMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): THREE.Mesh {
-    const deerMat = new THREE.MeshStandardMaterial({ color: 0xb47e4f, roughness: 0.75, flatShading: true });
+    const deerMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getDeerTexture(),
+      roughness: 0.75,
+      metalness: 0.05,
+    });
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.8 });
-    const antlerMat = new THREE.MeshStandardMaterial({ color: 0xfffaed, roughness: 0.35 });
-    mats.push(deerMat, whiteMat, antlerMat);
+    const muzzleMat = new THREE.MeshStandardMaterial({ color: 0x3d2112, roughness: 0.9 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f0f10 });
+    const antlerMat = new THREE.MeshStandardMaterial({ color: 0xfffaed, roughness: 0.4 });
+    const hoofMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
+    mats.push(deerMat, whiteMat, muzzleMat, eyeMat, antlerMat, hoofMat);
 
-    // 身体流线型多边形
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.75, 1.45), deerMat);
+    // 主流线型胸腹与躯干 (前胸宽、腰腹略收、后臀丰满)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 1.4, 8), deerMat);
+    body.rotation.x = Math.PI / 2;
     body.position.y = 1.15;
     parent.add(body);
 
-    // 浅白色下腹部与臀部
-    const belly = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.28, 1.2), whiteMat);
-    belly.position.set(0, 0.88, 0);
-    parent.add(belly);
+    // 乳白色下腹与胸口
+    const chestBelly = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 1.1, 6), whiteMat);
+    chestBelly.rotation.x = Math.PI / 2;
+    chestBelly.position.set(0, 0.95, 0.05);
+    parent.add(chestBelly);
 
-    // 挺拔优雅的长颈部
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.85, 6), deerMat);
-    neck.position.set(0, 1.6, 0.55);
-    neck.rotation.x = Math.PI / 5.5;
+    // 挺拔优雅的长颈部 (向上向前倾斜)
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 0.82, 8), deerMat);
+    neck.position.set(0, 1.58, 0.58);
+    neck.rotation.x = Math.PI / 5.2;
     parent.add(neck);
 
-    // 鹿头
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.35, 0.55), deerMat);
-    head.position.set(0, 1.95, 0.8);
+    // 鹿头主部 (优雅微锥形)
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.65, 7), deerMat);
+    head.position.set(0, 1.95, 0.88);
+    head.rotation.x = -Math.PI / 2.8;
     parent.add(head);
 
-    // 对称多叉立体鹿角
-    [-0.16, 0.16].forEach((side) => {
-      const main = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.65, 5), antlerMat);
-      main.position.set(side, 2.32, 0.75);
-      main.rotation.z = side * -0.45;
-      main.rotation.x = -0.25;
-      parent.add(main);
+    // 鹿鼻吻深色鼻镜
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.22), muzzleMat);
+    muzzle.position.set(0, 1.82, 1.2);
+    parent.add(muzzle);
 
-      const branch1 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.32, 4), antlerMat);
-      branch1.position.set(side * 1.5, 2.42, 0.82);
-      branch1.rotation.z = side * -0.8;
-      parent.add(branch1);
+    // 灵动黑眼睛与长耳
+    [-0.14, 0.14].forEach((side) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), eyeMat);
+      eye.position.set(side, 2.02, 0.92);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.32, 5), deerMat);
+      ear.position.set(side * 1.6, 2.22, 0.72);
+      ear.rotation.z = side * -0.65;
+      ear.rotation.x = -0.4;
+      parent.add(ear);
     });
 
-    // 四条修长鹿腿 (支持四足奔跑伸展跳跃)
-    const legGeo = new THREE.CylinderGeometry(0.065, 0.045, 0.85, 5);
+    // 对称多叉立体鹿角 (主枝 + 双分叉)
+    [-0.16, 0.16].forEach((side) => {
+      const main = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.055, 0.72, 6), antlerMat);
+      main.position.set(side, 2.38, 0.75);
+      main.rotation.z = side * -0.42;
+      main.rotation.x = -0.28;
+      parent.add(main);
+
+      const branch1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.035, 0.36, 5), antlerMat);
+      branch1.position.set(side * 1.6, 2.48, 0.82);
+      branch1.rotation.z = side * -0.85;
+      branch1.rotation.x = 0.15;
+      parent.add(branch1);
+
+      const branch2 = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.028, 0.28, 4), antlerMat);
+      branch2.position.set(side * 1.3, 2.72, 0.7);
+      branch2.rotation.z = side * 0.3;
+      branch2.rotation.x = -0.4;
+      parent.add(branch2);
+    });
+
+    // 优雅小鹿尾 (白色底绒)
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, 5), whiteMat);
+    tail.position.set(0, 1.25, -0.72);
+    tail.rotation.x = Math.PI / 4;
+    parent.add(tail);
+
+    // 四条修长鹿腿 (上粗下细 + 深色蹄角)
+    const legGeo = new THREE.CylinderGeometry(0.058, 0.038, 0.88, 6);
+    const hoofGeo = new THREE.CylinderGeometry(0.042, 0.048, 0.12, 6);
     [
       [-0.24, 0.45],
       [0.24, 0.45],
       [-0.24, -0.45],
       [0.24, -0.45],
     ].forEach(([lx, lz]) => {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, 0.44, lz);
+
       const leg = new THREE.Mesh(legGeo, deerMat);
-      leg.position.set(lx, 0.42, lz);
-      parent.add(leg);
-      legs.push(leg);
+      legGroup.add(leg);
+
+      const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+      hoof.position.y = -0.42;
+      legGroup.add(hoof);
+
+      parent.add(legGroup);
+      legs.push(leg as unknown as THREE.Mesh);
     });
 
     return head;
@@ -452,47 +503,97 @@ export class EntityManager {
    * 2. 逼真野猪 (Boar)：厚实躯体、拱起刚毛脊椎脊棱、锋利白色反曲獠牙
    */
   private buildBoarMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): THREE.Mesh {
-    const boarMat = new THREE.MeshStandardMaterial({ color: 0x3d312a, roughness: 0.9, flatShading: true });
-    const ridgeMat = new THREE.MeshStandardMaterial({ color: 0x1f1712, roughness: 0.95 });
-    const tuskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-    mats.push(boarMat, ridgeMat, tuskMat);
+    const boarMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getBoarTexture(),
+      roughness: 0.9,
+      metalness: 0.02,
+    });
+    const ridgeMat = new THREE.MeshStandardMaterial({ color: 0x181310, roughness: 0.95 });
+    const snoutMat = new THREE.MeshStandardMaterial({ color: 0x5a3f35, roughness: 0.8 });
+    const tuskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 });
+    const hoofMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.9 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+    mats.push(boarMat, ridgeMat, snoutMat, tuskMat, hoofMat, eyeMat);
 
     // 粗厚敦实身躯
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.85, 1.4), boarMat);
-    body.position.y = 0.75;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.46, 1.45, 8), boarMat);
+    body.rotation.x = Math.PI / 2;
+    body.position.y = 0.78;
     parent.add(body);
 
     // 脊背刚毛凸起
-    const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 1.3), ridgeMat);
-    ridge.position.set(0, 1.25, 0);
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.32, 1.4), ridgeMat);
+    ridge.position.set(0, 1.28, 0);
     parent.add(ridge);
 
     // 头部与粗大鼻吻
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.6, 0.8), boarMat);
-    head.position.set(0, 0.65, 0.85);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.85, 7), boarMat);
+    head.position.set(0, 0.72, 0.95);
+    head.rotation.x = -Math.PI / 2.3;
     parent.add(head);
 
+    // 标志性拱地鼻吻盘 (Snout Disc)
+    const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.16, 8), snoutMat);
+    snout.position.set(0, 0.62, 1.42);
+    snout.rotation.x = Math.PI / 2;
+    parent.add(snout);
+
+    // 鼻孔
+    [-0.055, 0.055].forEach((nx) => {
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 5), ridgeMat);
+      nostril.position.set(nx, 0.62, 1.51);
+      parent.add(nostril);
+    });
+
     // 向上反挑的锋利獠牙
-    [-0.32, 0.32].forEach((tx) => {
-      const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.32, 5), tuskMat);
-      tusk.position.set(tx, 0.55, 1.15);
-      tusk.rotation.x = -Math.PI / 3;
-      tusk.rotation.z = tx * -0.3;
+    [-0.24, 0.24].forEach((tx) => {
+      const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.36, 6), tuskMat);
+      tusk.position.set(tx, 0.66, 1.32);
+      tusk.rotation.x = -Math.PI / 3.2;
+      tusk.rotation.z = tx * -0.45;
       parent.add(tusk);
     });
 
+    // 小眼睛与尖耳
+    [-0.25, 0.25].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 5, 5), eyeMat);
+      eye.position.set(ex, 0.92, 0.92);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.24, 4), boarMat);
+      ear.position.set(ex * 1.3, 1.05, 0.78);
+      ear.rotation.z = ex * -0.5;
+      ear.rotation.x = -0.3;
+      parent.add(ear);
+    });
+
+    // 细小刚毛尾巴
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.35, 4), boarMat);
+    tail.position.set(0, 0.78, -0.76);
+    tail.rotation.x = -Math.PI / 4;
+    parent.add(tail);
+
     // 四条低重心短粗腿
-    const legGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.5, 6);
+    const legGeo = new THREE.CylinderGeometry(0.12, 0.08, 0.52, 6);
+    const hoofGeo = new THREE.CylinderGeometry(0.085, 0.095, 0.1, 6);
     [
       [-0.34, 0.45],
       [0.34, 0.45],
       [-0.34, -0.45],
       [0.34, -0.45],
     ].forEach(([lx, lz]) => {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, 0.26, lz);
+
       const leg = new THREE.Mesh(legGeo, boarMat);
-      leg.position.set(lx, 0.25, lz);
-      parent.add(leg);
-      legs.push(leg);
+      legGroup.add(leg);
+
+      const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+      hoof.position.y = -0.24;
+      legGroup.add(hoof);
+
+      parent.add(legGroup);
+      legs.push(leg as unknown as THREE.Mesh);
     });
 
     return head;
@@ -502,43 +603,89 @@ export class EntityManager {
    * 3. 逼真巨熊 (Bear)：庞大肩部肌肉隆起 (Hump)、宽阔熊头、厚实巨掌
    */
   private buildBearMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): THREE.Mesh {
-    const bearMat = new THREE.MeshStandardMaterial({ color: 0x2e1f16, roughness: 0.95, flatShading: true });
-    mats.push(bearMat);
+    const bearMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getBearTexture(),
+      roughness: 0.92,
+      metalness: 0.02,
+    });
+    const snoutMat = new THREE.MeshStandardMaterial({ color: 0x5a3e2e, roughness: 0.85 });
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0x120d09, roughness: 0.4 });
+    const clawMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.6 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x080808 });
+    mats.push(bearMat, snoutMat, noseMat, clawMat, eyeMat);
 
     // 宽厚庞大躯干
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.35, 2.1), bearMat);
-    body.position.y = 1.28;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.68, 2.1, 8), bearMat);
+    body.rotation.x = Math.PI / 2;
+    body.position.y = 1.32;
     parent.add(body);
 
     // 肩胛部强壮肌肉隆起
-    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.68, 8, 8), bearMat);
-    hump.position.set(0, 1.85, 0.45);
+    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.72, 8, 8), bearMat);
+    hump.position.set(0, 1.88, 0.42);
+    hump.scale.set(1.0, 0.75, 1.2);
     parent.add(hump);
 
     // 熊头
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.78, 0.95), bearMat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 8), bearMat);
     head.position.set(0, 1.62, 1.25);
+    head.scale.set(1.0, 0.9, 1.15);
     parent.add(head);
 
-    // 浑圆熊耳
-    [-0.32, 0.32].forEach((ex) => {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), bearMat);
-      ear.position.set(ex, 2.05, 1.15);
+    // 浅棕色吻部与黑鼻
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.35, 0.45), snoutMat);
+    snout.position.set(0, 1.5, 1.72);
+    parent.add(snout);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.12), noseMat);
+    nose.position.set(0, 1.6, 1.95);
+    parent.add(nose);
+
+    // 小眼睛与浑圆熊耳
+    [-0.26, 0.26].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 5, 5), eyeMat);
+      eye.position.set(ex, 1.74, 1.62);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), bearMat);
+      ear.position.set(ex * 1.5, 2.08, 1.12);
+      ear.scale.set(0.6, 1.0, 0.8);
       parent.add(ear);
     });
 
-    // 强健厚重熊腿
-    const legGeo = new THREE.CylinderGeometry(0.24, 0.2, 0.8, 7);
+    // 熊尾巴
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), bearMat);
+    tail.position.set(0, 1.45, -1.1);
+    parent.add(tail);
+
+    // 强健厚重熊腿与大熊掌
+    const legGeo = new THREE.CylinderGeometry(0.24, 0.18, 0.82, 7);
+    const pawGeo = new THREE.BoxGeometry(0.38, 0.16, 0.48);
     [
       [-0.55, 0.65],
       [0.55, 0.65],
       [-0.55, -0.65],
       [0.55, -0.65],
     ].forEach(([lx, lz]) => {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, 0.41, lz);
+
       const leg = new THREE.Mesh(legGeo, bearMat);
-      leg.position.set(lx, 0.4, lz);
-      parent.add(leg);
-      legs.push(leg);
+      legGroup.add(leg);
+
+      const paw = new THREE.Mesh(pawGeo, bearMat);
+      paw.position.set(0, -0.38, 0.1);
+      legGroup.add(paw);
+
+      [-0.11, 0, 0.11].forEach((cx) => {
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 4), clawMat);
+        claw.position.set(cx, -0.38, 0.36);
+        claw.rotation.x = Math.PI / 2;
+        legGroup.add(claw);
+      });
+
+      parent.add(legGroup);
+      legs.push(leg as unknown as THREE.Mesh);
     });
 
     return head;
@@ -548,36 +695,65 @@ export class EntityManager {
    * 4. 猎犬 (Hound Dog)：亮蓝色友军项圈、活跃摇摆尾巴、敏捷躯体
    */
   private buildHoundDogMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): THREE.Mesh {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd97724, roughness: 0.8, flatShading: true });
+    const dogMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getDogTexture(),
+      roughness: 0.82,
+      metalness: 0.02,
+    });
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 });
+    const muzzleMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 });
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
     const collarMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff }); // 亮蓝色友军项圈
-    mats.push(bodyMat, whiteMat, collarMat);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
+    mats.push(dogMat, whiteMat, muzzleMat, noseMat, collarMat, eyeMat);
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.5, 0.95), bodyMat);
+    // 流线型敏捷躯干
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.96, 8), dogMat);
+    body.rotation.x = Math.PI / 2;
     body.position.y = 0.65;
     parent.add(body);
 
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), whiteMat);
-    chest.position.set(0, 0.6, 0.32);
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.32, 0.42), whiteMat);
+    chest.position.set(0, 0.58, 0.34);
     parent.add(chest);
 
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.35, 0.45), bodyMat);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.32, 0.44), dogMat);
     head.position.set(0, 0.95, 0.55);
     parent.add(head);
 
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.32), muzzleMat);
+    muzzle.position.set(0, 0.88, 0.78);
+    parent.add(muzzle);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.08), noseMat);
+    nose.position.set(0, 0.95, 0.95);
+    parent.add(nose);
+
+    // 友善大眼睛与下垂耳朵
+    [-0.12, 0.12].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeMat);
+      eye.position.set(ex, 1.02, 0.68);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.35, 0.18), dogMat);
+      ear.position.set(ex * 1.8, 0.92, 0.5);
+      ear.rotation.z = ex * 0.2;
+      parent.add(ear);
+    });
+
     // 醒目亮蓝项圈
-    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.05, 6, 16), collarMat);
-    collar.position.set(0, 0.82, 0.45);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.045, 6, 16), collarMat);
+    collar.position.set(0, 0.82, 0.44);
     collar.rotation.x = Math.PI / 3;
     parent.add(collar);
 
     // 活跃摇尾
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.45, 5), whiteMat);
-    tail.position.set(0, 0.9, -0.55);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.48, 6), whiteMat);
+    tail.position.set(0, 0.88, -0.58);
     tail.rotation.x = -Math.PI / 4;
     parent.add(tail);
 
-    const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.45, 5);
+    const legGeo = new THREE.CylinderGeometry(0.055, 0.045, 0.46, 6);
     [
       [-0.18, 0.35],
       [0.18, 0.35],
@@ -585,7 +761,7 @@ export class EntityManager {
       [0.18, -0.35],
     ].forEach(([lx, lz]) => {
       const leg = new THREE.Mesh(legGeo, whiteMat);
-      leg.position.set(lx, 0.22, lz);
+      leg.position.set(lx, 0.23, lz);
       parent.add(leg);
       legs.push(leg);
     });
@@ -597,42 +773,109 @@ export class EntityManager {
    * 5. 奶牛 (Cow)
    */
   private buildCowMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): THREE.Mesh {
-    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8, flatShading: true });
-    const blackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 });
-    const hornMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
-    mats.push(whiteMat, blackMat, hornMat);
+    const cowMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getCowTexture(),
+      roughness: 0.8,
+      metalness: 0.02,
+    });
+    const muzzleMat = new THREE.MeshStandardMaterial({ color: 0xfda4af, roughness: 0.7 }); // 柔粉色鼻吻
+    const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.4 });
+    const hornTipMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 });
+    const hoofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+    const udderMat = new THREE.MeshStandardMaterial({ color: 0xfecdd3, roughness: 0.7 });
+    mats.push(cowMat, muzzleMat, hornMat, hornTipMat, hoofMat, eyeMat, udderMat);
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.8), whiteMat);
-    body.position.y = 1.1;
+    // 丰满身躯
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.58, 1.85, 8), cowMat);
+    body.rotation.x = Math.PI / 2;
+    body.position.y = 1.15;
     parent.add(body);
 
-    // 奶牛黑斑
-    const patch1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.6), blackMat);
-    patch1.position.set(0.4, 1.15, 0.3);
-    parent.add(patch1);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.72, 7), cowMat);
+    neck.position.set(0, 1.35, 0.88);
+    neck.rotation.x = Math.PI / 4.8;
+    parent.add(neck);
 
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.7), whiteMat);
-    head.position.set(0, 1.45, 1.1);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.68), cowMat);
+    head.position.set(0, 1.55, 1.25);
     parent.add(head);
 
-    [-0.32, 0.32].forEach((hx) => {
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 5), hornMat);
-      horn.position.set(hx, 1.85, 1.05);
-      horn.rotation.z = hx * -0.6;
-      parent.add(horn);
+    // 柔粉色鼻吻与鼻孔
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.32, 0.36), muzzleMat);
+    muzzle.position.set(0, 1.36, 1.62);
+    parent.add(muzzle);
+
+    [-0.12, 0.12].forEach((nx) => {
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.045, 5, 5), hoofMat);
+      nostril.position.set(nx, 1.37, 1.8);
+      parent.add(nostril);
     });
 
-    const legGeo = new THREE.CylinderGeometry(0.14, 0.11, 0.75, 6);
+    // 眼睛与耳朵
+    [-0.32, 0.32].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 5, 5), eyeMat);
+      eye.position.set(ex, 1.62, 1.38);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.16), cowMat);
+      ear.position.set(ex * 1.3, 1.68, 1.15);
+      ear.rotation.z = ex * -0.25;
+      parent.add(ear);
+    });
+
+    // 优雅弧形牛角
+    [-0.26, 0.26].forEach((hx) => {
+      const hornBase = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.08, 0.3, 6), hornMat);
+      hornBase.position.set(hx, 1.9, 1.18);
+      hornBase.rotation.z = hx * -0.7;
+      hornBase.rotation.x = -0.3;
+      parent.add(hornBase);
+
+      const hornTip = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 5), hornTipMat);
+      hornTip.position.set(hx * 1.65, 2.05, 1.16);
+      hornTip.rotation.z = hx * -0.3;
+      parent.add(hornTip);
+    });
+
+    // 柔粉色乳房 (Udder)
+    const udder = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 6), udderMat);
+    udder.position.set(0, 0.72, -0.35);
+    udder.scale.set(1.0, 0.75, 1.2);
+    parent.add(udder);
+
+    // 细长牛尾巴与末端毛刷
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.82, 5), cowMat);
+    tail.position.set(0, 1.0, -0.96);
+    tail.rotation.x = -0.15;
+    parent.add(tail);
+
+    const tailTuft = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 5), hoofMat);
+    tailTuft.position.set(0, 0.55, -1.02);
+    tailTuft.rotation.x = Math.PI;
+    parent.add(tailTuft);
+
+    // 四条强壮柱状牛腿 + 偶蹄
+    const legGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.76, 7);
+    const hoofGeo = new THREE.CylinderGeometry(0.095, 0.11, 0.14, 6);
     [
       [-0.45, 0.6],
       [0.45, 0.6],
       [-0.45, -0.6],
       [0.45, -0.6],
     ].forEach(([lx, lz]) => {
-      const leg = new THREE.Mesh(legGeo, whiteMat);
-      leg.position.set(lx, 0.38, lz);
-      parent.add(leg);
-      legs.push(leg);
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, 0.38, lz);
+
+      const leg = new THREE.Mesh(legGeo, cowMat);
+      legGroup.add(leg);
+
+      const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+      hoof.position.y = -0.36;
+      legGroup.add(hoof);
+
+      parent.add(legGroup);
+      legs.push(leg as unknown as THREE.Mesh);
     });
 
     return head;
@@ -642,30 +885,62 @@ export class EntityManager {
    * 6. 绵羊 (Sheep)
    */
   private buildSheepMesh(parent: THREE.Group, mats: THREE.Material[], legs: THREE.Mesh[]): void {
-    const woolMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 1.0, flatShading: true });
-    const faceMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-    mats.push(woolMat, faceMat);
+    const woolMat = new THREE.MeshStandardMaterial({
+      map: TextureGenerator.getSheepTexture(),
+      roughness: 0.98,
+      metalness: 0.02,
+    });
+    const faceMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+    const hoofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+    mats.push(woolMat, faceMat, hoofMat, eyeMat);
 
-    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 1), woolMat);
-    body.scale.set(1.1, 0.9, 1.3);
-    body.position.y = 0.75;
+    // 蓬松卷曲绵羊躯干
+    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.72, 2), woolMat);
+    body.scale.set(1.15, 0.95, 1.35);
+    body.position.y = 0.78;
     parent.add(body);
 
-    const face = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.38), faceMat);
-    face.position.set(0, 0.85, 0.75);
+    const woolCap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 7, 7), woolMat);
+    woolCap.position.set(0, 1.08, 0.78);
+    parent.add(woolCap);
+
+    const face = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.32, 0.42), faceMat);
+    face.position.set(0, 0.92, 0.92);
     parent.add(face);
 
-    const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.5, 5);
+    [-0.16, 0.16].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 5), eyeMat);
+      eye.position.set(ex, 0.98, 0.98);
+      parent.add(eye);
+
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.12), faceMat);
+      ear.position.set(ex * 1.3, 1.0, 0.78);
+      ear.rotation.z = ex * 0.35;
+      parent.add(ear);
+    });
+
+    // 细巧羊腿 + 小黑蹄
+    const legGeo = new THREE.CylinderGeometry(0.055, 0.045, 0.52, 6);
+    const hoofGeo = new THREE.CylinderGeometry(0.048, 0.055, 0.1, 5);
     [
-      [-0.25, 0.35],
-      [0.25, 0.35],
-      [-0.25, -0.35],
-      [0.25, -0.35],
+      [-0.26, 0.35],
+      [0.26, 0.35],
+      [-0.26, -0.35],
+      [0.26, -0.35],
     ].forEach(([lx, lz]) => {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(lx, 0.26, lz);
+
       const leg = new THREE.Mesh(legGeo, faceMat);
-      leg.position.set(lx, 0.25, lz);
-      parent.add(leg);
-      legs.push(leg);
+      legGroup.add(leg);
+
+      const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+      hoof.position.y = -0.24;
+      legGroup.add(hoof);
+
+      parent.add(legGroup);
+      legs.push(leg as unknown as THREE.Mesh);
     });
   }
 

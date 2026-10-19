@@ -156,6 +156,17 @@ export class DuckHuntEngine {
     this.roundHitCount = 0;
     this.targetResults = Array(10).fill('pending');
 
+    // 飞盘射击 (Game C) 循序渐进难度系统：
+    // Round 1-4: 每次只抛 1 个单飞盘 (10波次，每次1个)，超高大抛物线，宽裕滞空！
+    // Round 5+: 进入双飞盘挑战 (5波次，每次2个)，带交叉相向抛射！
+    if (this.submode === 'game_c') {
+      this.targetsPerWave = this.round <= 4 ? 1 : 2;
+      this.totalWaves = this.round <= 4 ? 10 : 5;
+    } else {
+      this.targetsPerWave = this.submode === 'game_a' ? 1 : 2;
+      this.totalWaves = this.submode === 'game_a' ? 10 : 5;
+    }
+
     this.emitHUD();
 
     // 回合开局动画：猎犬闻嗅跑过草丛并跳入其中 (Game A & B)
@@ -278,9 +289,17 @@ export class DuckHuntEngine {
     this.emitHUD();
 
     if (this.submode === 'game_c') {
-      // Game C: 抛掷 2 个飞盘
-      this.spawnClayPigeon(-1.4);
-      this.spawnClayPigeon(1.4);
+      const isDouble = this.targetsPerWave === 2;
+      if (!isDouble) {
+        // 单飞盘 (Round 1-4)：交替从左或右轻缓抛出大高拱抛物线
+        const side = this.waveIndex % 2 === 0 ? -0.8 : 0.8;
+        this.spawnClayPigeon(side, false);
+      } else {
+        // 双飞盘 (Round 5+)：两飞盘交叉或高低并飞
+        const isCrossed = this.round >= 6 && this.waveIndex % 2 === 1;
+        this.spawnClayPigeon(-1.4, isCrossed);
+        this.spawnClayPigeon(1.4, isCrossed);
+      }
       this.audioManager.playNesClayLaunch();
     } else {
       // Game A/B: 生成 1 只或 2 只野鸭
@@ -358,33 +377,57 @@ export class DuckHuntEngine {
   }
 
   /**
-   * 生成飞盘 (Game C: 向远方抛射飞向 Z = -24m)
+   * 生成飞盘 (Game C: 循序渐进抛射系统，高抛长滞空)
    */
-  private spawnClayPigeon(sideOffset: number): void {
+  private spawnClayPigeon(sideOffset: number, isCrossed: boolean = false): void {
     const group = new THREE.Group();
     // 从脚前抛出
-    group.position.set(sideOffset * 0.8, -1.2, -3.2);
+    group.position.set(sideOffset * 0.7, -1.2, -3.2);
 
-    const clayGeo = new THREE.CylinderGeometry(0.24, 0.26, 0.05, 16);
+    // 鲜艳荧光橙色飞盘与微发光核心
+    const clayGeo = new THREE.CylinderGeometry(0.24, 0.27, 0.055, 16);
     const clayMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316, // 亮橙色飞盘
-      roughness: 0.4,
-      metalness: 0.1,
+      color: 0xf97316,
+      roughness: 0.35,
+      metalness: 0.15,
+      emissive: 0xea580c,
+      emissiveIntensity: 0.35,
     });
     const mesh = new THREE.Mesh(clayGeo, clayMat);
     mesh.rotation.x = Math.PI / 4;
     group.add(mesh);
 
     // 橘白相间条纹顶盖
-    const topStripeGeo = new THREE.CylinderGeometry(0.14, 0.15, 0.06, 16);
+    const topStripeGeo = new THREE.CylinderGeometry(0.14, 0.15, 0.065, 16);
     const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const stripe = new THREE.Mesh(topStripeGeo, stripeMat);
     group.add(stripe);
 
-    const roundSpeedFactor = 1.0 + (this.round - 1) * 0.06;
-    const forwardSpd = THREE.MathUtils.randFloat(11, 15) * roundSpeedFactor;
-    const upSpd = THREE.MathUtils.randFloat(4.5, 6.5);
-    const sideSpd = sideOffset * THREE.MathUtils.randFloat(1.2, 2.4);
+    // 速度与高度梯度计算：Round 1-2 极缓高抛，留出充足瞄准时间！
+    let forwardSpd: number;
+    let upSpd: number;
+    let sideSpd: number;
+    let gravity: number;
+
+    if (this.round <= 2) {
+      // Round 1-2 (入门体验): 慢速、超高优美抛物线、超长滞空时间 (~3.8s)
+      forwardSpd = THREE.MathUtils.randFloat(6.5, 8.0);
+      upSpd = THREE.MathUtils.randFloat(8.8, 10.2);
+      sideSpd = sideOffset * 0.65;
+      gravity = 3.5;
+    } else if (this.round <= 4) {
+      // Round 3-4 (进阶): 稍快、饱满弧线 (~3.0s)
+      forwardSpd = THREE.MathUtils.randFloat(8.2, 10.0);
+      upSpd = THREE.MathUtils.randFloat(8.0, 9.4);
+      sideSpd = sideOffset * 1.0;
+      gravity = 4.0;
+    } else {
+      // Round 5+ (双飞盘进阶挑战): 交叉或相向高速飞行
+      forwardSpd = THREE.MathUtils.randFloat(9.5, 12.0);
+      upSpd = THREE.MathUtils.randFloat(7.0, 8.6);
+      sideSpd = isCrossed ? -sideOffset * 1.6 : sideOffset * 1.3;
+      gravity = 4.6;
+    }
 
     const velocity = new THREE.Vector3(sideSpd, upSpd, -forwardSpd);
 
@@ -397,7 +440,7 @@ export class DuckHuntEngine {
       colliderMeshes: [mesh],
       position: group.position,
       velocity,
-      gravity: 5.5,
+      gravity,
       state: 'flying',
       scoreValue: scoreVal,
       isHit: false,
@@ -1018,7 +1061,7 @@ export class DuckHuntEngine {
     this.dogGroup.visible = true;
     this.dogGroup.position.x = 0;
     this.dogCurrentY = -3.2;
-    this.dogTargetY = -0.55; // 升出草丛，胸口与战利品清晰可见
+    this.dogTargetY = 0.08; // 升出草丛，胸口、爪臂与高举的战利品野鸭完全显露在空中！
 
     // 切换为自豪常态笑脸，收起捂嘴爪子
     if (this.dogNormalEyes) this.dogNormalEyes.visible = true;
@@ -1032,25 +1075,57 @@ export class DuckHuntEngine {
       while (this.caughtDucksGroup.children.length > 0) {
         this.caughtDucksGroup.remove(this.caughtDucksGroup.children[0]);
       }
-      const duckMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
-      const billMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-      const offsets = caughtCount === 1 ? [0] : [-0.35, 0.35];
+
+      // 构建色彩鲜艳逼真的战利品野鸭 (翡翠绿头 + 白项圈 + 金喙 + 栗身 + 垂挂双足)
+      const greenHeadMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5 });
+      const whiteRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const brownBodyMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+      const blueWingMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.6 });
+      const yellowBillMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const orangeFootMat = new THREE.MeshBasicMaterial({ color: 0xea580c });
+
+      const offsets = caughtCount === 1 ? [0.42] : [-0.42, 0.42];
       offsets.forEach((ox) => {
         const duckModel = new THREE.Group();
-        const dBody = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 0.3), duckMat);
+        duckModel.position.set(ox, 1.45, 0.45);
+
+        // 倒挂下垂的身躯
+        const dBody = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.48, 0.28), brownBodyMat);
         duckModel.add(dBody);
-        const dHead = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.26), duckMat);
-        dHead.position.set(0, 0.3, 0.05);
+
+        // 翼镜蓝斑
+        const dWing = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.25, 0.12), blueWingMat);
+        dWing.position.set(0, -0.05, 0);
+        duckModel.add(dWing);
+
+        // 倒挂垂向下的翡翠绿鸭头
+        const dHead = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), greenHeadMat);
+        dHead.position.set(0, -0.32, 0.05);
         duckModel.add(dHead);
-        const dBill = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.2), billMat);
-        dBill.position.set(0, 0.26, 0.2);
+
+        // 颈部白环
+        const dRing = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, 0.25), whiteRingMat);
+        dRing.position.set(0, -0.22, 0.05);
+        duckModel.add(dRing);
+
+        // 金黄鸭喙
+        const dBill = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.22), yellowBillMat);
+        dBill.position.set(0, -0.36, 0.18);
         duckModel.add(dBill);
-        duckModel.position.set(ox, 0, 0);
+
+        // 向上被抓提的两只橙红鸭掌
+        [-0.08, 0.08].forEach((fx) => {
+          const foot = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), orangeFootMat);
+          foot.position.set(fx, 0.32, 0);
+          duckModel.add(foot);
+        });
+
         this.caughtDucksGroup!.add(duckModel);
       });
     }
 
     this.audioManager.playNesDogCatch();
+    this.spawnCelebrationToast(caughtCount === 1 ? '🎉 命中！猎犬高举战利品野鸭！' : '🎉 神准！双鸭齐中！', true);
 
     setTimeout(() => {
       this.dogTargetY = -3.2; // 平滑降回草丛后
@@ -1059,7 +1134,7 @@ export class DuckHuntEngine {
         this.dogGroup.visible = false;
         onDone();
       }, 400);
-    }, 1450);
+    }, 1600);
   }
 
   /**
@@ -1074,7 +1149,7 @@ export class DuckHuntEngine {
     this.dogGroup.visible = true;
     this.dogGroup.position.x = 0;
     this.dogCurrentY = -3.2;
-    this.dogTargetY = -0.55; // 升出草丛，胸口、笑脸和捂嘴双爪露面
+    this.dogTargetY = 0.08; // 升出草丛，胸口、笑脸和捂嘴双爪露面
     this.dogGroup.position.y = this.dogCurrentY;
 
     // 切换到眯眼笑 + 张嘴吐舌 + 双爪捂嘴
@@ -1086,6 +1161,7 @@ export class DuckHuntEngine {
     if (this.dogAlertMark) this.dogAlertMark.visible = false;
 
     this.audioManager.playNesDogLaugh();
+    this.spawnCelebrationToast('💨 逃脱了！(FLY AWAY)', false);
 
     // 嘲笑 1.6 秒后平滑缩回草丛下并完全隐藏
     setTimeout(() => {
@@ -1094,8 +1170,30 @@ export class DuckHuntEngine {
         this.dogState = 'hidden';
         this.dogGroup.visible = false;
         onDone();
-      }, 400);
-    }, 1600);
+      }, 450);
+    }, 1650);
+  }
+
+  private spawnCelebrationToast(text: string, isSuccess: boolean): void {
+    const container = document.getElementById('hit-feedback-container');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = 'hit-float-text nes-celebrate-toast';
+    el.style.left = '50%';
+    el.style.top = '36%';
+    el.style.fontSize = '20px';
+    el.style.fontWeight = '900';
+    el.style.color = isSuccess ? '#4ade80' : '#f87171';
+    el.style.textShadow = isSuccess
+      ? '0 0 12px rgba(74, 222, 128, 0.9), 0 2px 4px #000'
+      : '0 0 12px rgba(248, 113, 113, 0.9), 0 2px 4px #000';
+    el.textContent = text;
+    container.appendChild(el);
+
+    setTimeout(() => {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 1400);
   }
 
   private updateDogAnimation(delta: number): void {
