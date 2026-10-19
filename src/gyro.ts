@@ -92,10 +92,21 @@ export class GyroController {
       requestPermission?: () => Promise<'granted' | 'denied'>;
     };
 
-    // 1. iOS 13+ 显式权限触发
+    // 1. iOS 13+ 显式权限触发 (同时请求 Orientation 与 Motion 权限以支持甩动切枪)
     if (typeof DeviceOrientation !== 'undefined' && typeof DeviceOrientation.requestPermission === 'function') {
       try {
         const permissionState = await DeviceOrientation.requestPermission();
+        const DeviceMotion = window.DeviceMotionEvent as unknown as {
+          requestPermission?: () => Promise<'granted' | 'denied'>;
+        };
+        if (typeof DeviceMotion !== 'undefined' && typeof DeviceMotion.requestPermission === 'function') {
+          try {
+            await DeviceMotion.requestPermission();
+          } catch {
+            // 静默处理
+          }
+        }
+
         if (permissionState === 'granted') {
           this.startListening();
           return true;
@@ -262,15 +273,21 @@ export class GyroController {
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(rawQuat);
       const currentYaw = Math.atan2(forward.x, -forward.z);
 
-      this.calibrationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -currentYaw);
+      // 将当前手机物理朝向旋转校准为虚拟空间的正前方 (Z = -1, Yaw = 0)
+      this.calibrationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), currentYaw);
+      this.targetQuat.copy(this.calibrationQuat).multiply(rawQuat);
+      this.camera.quaternion.copy(this.targetQuat);
     } else {
       this.mouseYaw = 0;
       this.mousePitch = 0;
       this.calibrationQuat.identity();
+      this.mouseQuat.identity();
+      this.targetQuat.identity();
+      this.camera.quaternion.identity();
     }
 
     // 重置平滑目标使得校准瞬间生效
-    this.isInitializedQuat = false;
+    this.isInitializedQuat = true;
   }
 
   /**

@@ -803,7 +803,14 @@ class ArShooterGame {
     }
 
     // 360 沙盒多武器射击逻辑
-    if (!this.weaponManager.canFire()) return;
+    if (!this.weaponManager.canFire()) {
+      this.showHitPopup('⏳ 换弹/冷却中...', true, 'blocked-hint');
+      return;
+    }
+
+    // 开火按钮触感后坐力动效
+    this.fireBtnEl.classList.add('fire-kick');
+    setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
 
     const currentWeapon = this.weaponManager.getCurrentConfig();
 
@@ -827,6 +834,18 @@ class ArShooterGame {
       const pelletNdc = new THREE.Vector2(spreadX, spreadY);
 
       this.raycaster.setFromCamera(pelletNdc, activeCam);
+
+      // 1. 检查是否射中敌机等离子子弹 (防守拦截机制)
+      const projHit = this.entityManager.checkProjectileIntersection(this.raycaster);
+      if (projHit.hit && projHit.point) {
+        this.score += 50;
+        this.scoreValEl.textContent = this.score.toString();
+        this.modeManager.updateHighScore(this.modeManager.getMode(), this.score);
+        this.audioManager.playTargetHit(true);
+        this.showHitPopup('💥 成功拦截等离子弹！+50', false, 'hit-score');
+        this.createLaserBeam(this.tempCamPos, projHit.point, 0x00f3ff);
+        continue;
+      }
 
       const obsHit = this.environmentManager.checkObstacleIntersection(this.raycaster);
       const entHit = this.entityManager.checkRayIntersection(this.raycaster);
@@ -981,12 +1000,25 @@ class ArShooterGame {
   }
 
   /**
-   * 星际战机一键战术滚转侧闪推进
+   * 星际战机一键战术滚转侧闪推进 (带 0.85s 无敌规避帧 + 自动回正)
    */
   private triggerTacticalDodge(val: number): void {
     this.setPeekOffsetDirect(val);
+    this.entityManager.setPlayerInvulnerable(true);
     this.audioManager.playShipThrusterDodge();
-    this.showHitPopup(val < 0 ? '◀ 战术左滚转闪避！' : '战术右滚转闪避！ ▶', false, 'hit-score');
+    this.showHitPopup(val < 0 ? '◀ 战术左滚转闪避！(无敌)' : '战术右滚转闪避！(无敌) ▶', false, 'hit-score');
+
+    // 0.85s 无敌帧窗口后解除
+    setTimeout(() => {
+      this.entityManager.setPlayerInvulnerable(false);
+    }, 850);
+
+    // 1.2s 后自动平滑回正
+    setTimeout(() => {
+      if (this.modeManager.getMode() === 'scifi') {
+        this.setPeekOffsetDirect(0);
+      }
+    }, 1200);
   }
 
   /**
@@ -1251,7 +1283,7 @@ class ArShooterGame {
     const dir = new THREE.Vector3().subVectors(end, origin);
     const len = dir.length();
 
-    const geom = new THREE.CylinderGeometry(0.03, 0.03, len, 6);
+    const geom = new THREE.CylinderGeometry(0.045, 0.045, len, 6);
     geom.translate(0, len / 2, 0);
     geom.rotateX(Math.PI / 2);
 
@@ -1269,8 +1301,8 @@ class ArShooterGame {
     this.laserGroup.add(mesh);
     this.activeLasers.push({
       mesh,
-      life: 0.12,
-      maxLife: 0.12,
+      life: 0.22,
+      maxLife: 0.22,
     });
   }
 

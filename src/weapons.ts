@@ -84,18 +84,58 @@ export class WeaponManager {
   }
 
   /**
-   * 监听手机体感大幅甩动或上挑
+   * 监听手机体感甩动手势 (采用加速度差分突变算法，兼容 Android 与 iOS，手腕清脆一抖即切枪)
    */
   private initMotionSensor(): void {
-    window.addEventListener('devicemotion', (event) => {
-      const acc = event.acceleration;
-      if (!acc || acc.x === null || acc.y === null || acc.z === null) return;
+    let lastX = 0;
+    let lastY = 0;
+    let lastZ = 0;
+    let hasPrev = false;
 
-      const mag = Math.hypot(acc.x, acc.y, acc.z);
+    window.addEventListener('devicemotion', (event) => {
+      let x = 0;
+      let y = 0;
+      let z = 0;
+
+      // 优先纯线性加速度，若系统不支持则自动降级为含重力加速度并做差分滤波
+      if (event.acceleration && event.acceleration.x !== null && event.acceleration.y !== null && event.acceleration.z !== null) {
+        x = event.acceleration.x;
+        y = event.acceleration.y;
+        z = event.acceleration.z;
+      } else if (
+        event.accelerationIncludingGravity &&
+        event.accelerationIncludingGravity.x !== null &&
+        event.accelerationIncludingGravity.y !== null &&
+        event.accelerationIncludingGravity.z !== null
+      ) {
+        x = event.accelerationIncludingGravity.x;
+        y = event.accelerationIncludingGravity.y;
+        z = event.accelerationIncludingGravity.z;
+      } else {
+        return;
+      }
+
+      if (!hasPrev) {
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        hasPrev = true;
+        return;
+      }
+
+      const dx = x - lastX;
+      const dy = y - lastY;
+      const dz = z - lastZ;
+      lastX = x;
+      lastY = y;
+      lastZ = z;
+
+      // 计算加速度变化率突变量 (Jerk Intensity)
+      const deltaAcc = Math.hypot(dx, dy, dz);
       const now = performance.now();
 
-      // 阈值 > 18 m/s² 且防抖间隔 800ms
-      if (mag > 18.0 && now - this.lastShakeTime > 800) {
+      // 阈值设为 11.0 m/s²，手腕正常向上一挑或前后一甩即可触发，防抖 750ms
+      if (deltaAcc > 11.0 && now - this.lastShakeTime > 750) {
         this.lastShakeTime = now;
         this.switchNextWeapon();
       }

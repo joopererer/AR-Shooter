@@ -229,7 +229,7 @@ export class EntityManager {
 
     let radius = customRadius !== undefined ? customRadius : (
       this.currentMode === 'ghost'
-        ? THREE.MathUtils.randFloat(11.0, 15.5)
+        ? THREE.MathUtils.randFloat(5.5, 9.0)
         : this.currentMode === 'hunting'
         ? THREE.MathUtils.randFloat(7.5, 14.0)
         : (type === 'bear' ? 9.5 : type === 'starfighter' ? THREE.MathUtils.randFloat(8.5, 14.5) : THREE.MathUtils.randFloat(7.0, 11.0))
@@ -378,6 +378,9 @@ export class EntityManager {
     };
 
     group.userData = { gameEntity: entity };
+    group.traverse((c) => {
+      c.userData.gameEntity = entity;
+    });
     this.rootGroup.add(group);
     this.entities.push(entity);
 
@@ -1018,36 +1021,52 @@ export class EntityManager {
    */
   private buildGhostMesh(parent: THREE.Group, mats: THREE.Material[]): void {
     const ghostMat = new THREE.MeshStandardMaterial({
-      color: 0x80ffff,
-      roughness: 0.1,
-      metalness: 0.2,
-      emissive: 0x22d3ee,
-      emissiveIntensity: 0.7,
+      color: 0x67e8f9,
+      roughness: 0.2,
+      metalness: 0.1,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 0.85,
       transparent: true,
-      opacity: 0.03,
+      opacity: 0.82,
       depthWrite: false,
     });
     const eyeMat = new THREE.MeshBasicMaterial({
-      color: 0xff0055,
-      transparent: true,
-      opacity: 0.03,
+      color: 0xff0033,
     });
     mats.push(ghostMat, eyeMat);
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), ghostMat);
-    head.position.set(0, 0.4, 0);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 16, 16), ghostMat);
+    head.position.set(0, 0.45, 0);
     parent.add(head);
 
-    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.85, 16), ghostMat);
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.05, 16), ghostMat);
     skirt.rotation.x = Math.PI;
-    skirt.position.set(0, -0.1, 0);
+    skirt.position.set(0, -0.15, 0);
     parent.add(skirt);
 
-    [-0.14, 0.14].forEach((ex) => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), eyeMat);
-      eye.position.set(ex, 0.45, 0.36);
+    // 幽灵漂浮双爪
+    [-0.42, 0.42].forEach((ax) => {
+      const arm = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 6), ghostMat);
+      arm.position.set(ax, 0.2, 0.2);
+      arm.rotation.z = ax * -0.5;
+      arm.rotation.x = -Math.PI / 4;
+      parent.add(arm);
+    });
+
+    // 醒目发光猩红幽灵眼
+    [-0.15, 0.15].forEach((ex) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eyeMat);
+      eye.position.set(ex, 0.5, 0.42);
       parent.add(eye);
     });
+
+    // 宽松宽容度射击碰撞体 (确保移动端极易命中击中)
+    const hitCollider = new THREE.Mesh(
+      new THREE.SphereGeometry(0.85, 8, 8),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    hitCollider.position.set(0, 0.35, 0);
+    parent.add(hitCollider);
   }
 
   /**
@@ -1294,29 +1313,30 @@ export class EntityManager {
       return;
     }
 
-    // 3. 幽灵 (Ghost)：准星手电筒夹角 < 12° (dot > 0.978) 显形逃逸，不破坏铁围栏
+    // 3. 幽灵 (Ghost)：半透明浮空灵体，持续可见，准星靠近时惊骇战栗，轻缓游弋
     if (e.type === 'ghost') {
       this.tempDir.subVectors(e.position, this.tempCamPos).normalize();
       const dot = this.tempCamDir.dot(this.tempDir);
-      const isLitByFlashlight = dot > 0.978;
-      const targetOpacity = isLitByFlashlight ? 0.92 : 0.03;
-      e.currentOpacity += (targetOpacity - e.currentOpacity) * Math.min(1.0, delta * 9.0);
+      const isAimedAt = dot > 0.96;
+
+      const pulse = Math.sin(performance.now() * 0.005) * 0.1;
+      e.currentOpacity = isAimedAt ? 0.95 : 0.82 + pulse;
 
       e.materials.forEach((m) => {
         m.opacity = e.currentOpacity;
       });
 
-      if (isLitByFlashlight) {
-        e.state = 'fleeing';
-        const fleeDir = new THREE.Vector3().crossVectors(this.tempCamDir, new THREE.Vector3(0, 1, 0)).normalize();
-        if (Math.random() < 0.5) fleeDir.negate();
-        e.position.addScaledVector(fleeDir, e.speed * delta);
-        e.meshGroup.position.copy(e.position);
+      if (isAimedAt) {
+        // 准星锁定幽灵时，幽灵惊惧轻晃并微幅蛇形游弋，提供充裕瞄准击发窗口
+        e.meshGroup.position.x += Math.sin(performance.now() * 0.01) * 0.015;
+        const driftDir = new THREE.Vector3().crossVectors(this.tempCamDir, new THREE.Vector3(0, 1, 0)).normalize();
+        e.position.addScaledVector(driftDir, e.speed * 0.45 * delta);
       } else {
-        e.position.y += Math.sin(performance.now() * 0.002 + e.position.x) * 0.006;
-        e.meshGroup.position.copy(e.position);
+        // 平时在空中轻缓上下沉浮飘游
+        e.position.y += Math.sin(performance.now() * 0.003 + e.position.x) * 0.008;
       }
-      e.meshGroup.rotation.y += delta * 1.2;
+      e.meshGroup.position.copy(e.position);
+      e.meshGroup.rotation.y += delta * 0.8;
       return;
     }
 
@@ -1509,9 +1529,9 @@ export class EntityManager {
 
     pGroup.position.copy(origin);
 
-    // 朝向玩家当前相机位置发射 (降低弹速至 4.8 m/s，留出充足从容的闪避反应窗口)
+    // 朝向玩家当前相机位置发射 (降至 3.0 m/s，留出充足从容的闪避反应与拦截开火窗口)
     const dir = new THREE.Vector3().subVectors(this.tempCamPos, origin).normalize();
-    const speed = 4.8;
+    const speed = 3.0;
     const velocity = dir.multiplyScalar(speed);
 
     pGroup.lookAt(this.tempCamPos);
@@ -1521,13 +1541,61 @@ export class EntityManager {
       mesh: pGroup as unknown as THREE.Mesh,
       position: pGroup.position,
       velocity,
-      life: 5.5,
-      maxLife: 5.5,
+      life: 6.0,
+      maxLife: 6.0,
     });
 
     if (this.onEnemyFireCallback) {
       this.onEnemyFireCallback();
     }
+  }
+
+  private isPlayerInvulnerable: boolean = false;
+
+  public setPlayerInvulnerable(val: boolean): void {
+    this.isPlayerInvulnerable = val;
+  }
+
+  /**
+   * 玩家瞄准等离子子弹射击拦截判定 (Shoot down incoming enemy bullets!)
+   */
+  public checkProjectileIntersection(raycaster: THREE.Raycaster): { hit: boolean; point?: THREE.Vector3 } {
+    if (this.enemyProjectiles.length === 0) return { hit: false };
+
+    const projectileMeshes: THREE.Mesh[] = [];
+    this.enemyProjectiles.forEach((p) => {
+      p.mesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) projectileMeshes.push(child);
+      });
+    });
+
+    const intersects = raycaster.intersectObjects(projectileMeshes, true);
+    if (intersects.length > 0) {
+      const hitObj = intersects[0].object;
+      const hitIdx = this.enemyProjectiles.findIndex((p) => {
+        let match = false;
+        p.mesh.traverse((c) => { if (c === hitObj) match = true; });
+        return match;
+      });
+
+      if (hitIdx !== -1) {
+        const p = this.enemyProjectiles[hitIdx];
+        const pt = p.position.clone();
+        this.createExplosion(pt, 'alien');
+        this.projectileGroup.remove(p.mesh);
+        p.mesh.traverse((c) => {
+          if ((c as THREE.Mesh).geometry) (c as THREE.Mesh).geometry.dispose();
+          if ((c as THREE.Mesh).material) {
+            const mat = (c as THREE.Mesh).material;
+            if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+            else mat.dispose();
+          }
+        });
+        this.enemyProjectiles.splice(hitIdx, 1);
+        return { hit: true, point: pt };
+      }
+    }
+    return { hit: false };
   }
 
   private updateEnemyProjectiles(delta: number): void {
@@ -1538,9 +1606,15 @@ export class EntityManager {
       p.position.addScaledVector(p.velocity, delta);
       p.mesh.position.copy(p.position);
 
-      // 判断是否击中玩家座舱 (< 0.65m)
+      // 判断是否击中玩家座舱 (< 0.75m)
       const distToPlayer = p.position.distanceTo(this.tempCamPos);
-      if (distToPlayer < 0.65) {
+      if (distToPlayer < 0.75) {
+        if (this.isPlayerInvulnerable) {
+          // 战术滚转闪避成功，等离子子弹擦肩而过！
+          p.life = Math.min(p.life, 0.4);
+          continue;
+        }
+
         // 击中玩家！
         if (this.onPlayerHitCallback) {
           this.onPlayerHitCallback();
