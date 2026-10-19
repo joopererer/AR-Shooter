@@ -163,12 +163,21 @@ export class DuckHuntEngine {
   }
 
   /**
+   * 获取正前方舞台 Z 轴距离 (横屏模式自动拉近至 -5.8m，竖屏 -8.0m，兼顾开阔度与目标清晰度)
+   */
+  public getStageZ(): number {
+    const isLandscape = window.innerWidth > window.innerHeight;
+    return isLandscape ? -5.8 : -8.0;
+  }
+
+  /**
    * 构建正前方绿色草丛遮挡与小树舞台 (Spawn Framing)
-   * 固定在相机正前方 Z = -8m 处，保证舒适直视，无需大角度旋转
+   * 横屏 -5.8m / 竖屏 -8.0m，保证舒适直视，无需大角度旋转
    */
   private buildForegroundStage(): void {
     const stageGroup = new THREE.Group();
-    stageGroup.position.set(0, -1.5, -8.0);
+    const stageZ = this.getStageZ();
+    stageGroup.position.set(0, -1.5, stageZ);
 
     // 1. 经典 NES 翠绿锯齿草丛带 (Grass Thicket)
     const grassMat = new THREE.MeshStandardMaterial({
@@ -280,9 +289,10 @@ export class DuckHuntEngine {
     }
 
     const group = new THREE.Group();
-    // 从草丛后方腾空飞起 (Y = -1.2, Z = -8.0)
+    // 从草丛后方腾空飞起 (Y = -1.2, Z = stageZ)
     const startX = THREE.MathUtils.randFloat(0.5, 2.5) * offsetSign;
-    group.position.set(startX, -1.2, -8.0);
+    const stageZ = this.getStageZ();
+    group.position.set(startX, -1.2, stageZ);
 
     // 初始朝向斜上方飞出
     const initialDir = new THREE.Vector3(
@@ -584,7 +594,7 @@ export class DuckHuntEngine {
         d.position.addScaledVector(d.velocity, delta);
         d.meshGroup.position.copy(d.position);
 
-        // 视界边界框反弹: X in [-5, 5], Y in [-0.5, 4.2], Z in [-10.5, -7.5]
+        // 视界边界框反弹: X in [-5, 5], Y in [-0.5, 4.2], Z in [stageZ - 2.5, stageZ + 0.8]
         if (d.position.x < -5.0 || d.position.x > 5.0) {
           d.velocity.x = -d.velocity.x;
           d.position.x = Math.max(-5.0, Math.min(5.0, d.position.x));
@@ -592,6 +602,13 @@ export class DuckHuntEngine {
         if (d.position.y < -0.5 || d.position.y > 4.2) {
           d.velocity.y = -d.velocity.y;
           d.position.y = Math.max(-0.5, Math.min(4.2, d.position.y));
+        }
+        const stageZ = this.getStageZ();
+        const minZ = stageZ - 2.5;
+        const maxZ = stageZ + 0.8;
+        if (d.position.z < minZ || d.position.z > maxZ) {
+          d.velocity.z = -d.velocity.z;
+          d.position.z = Math.max(minZ, Math.min(maxZ, d.position.z));
         }
 
         // 面向飞动方向
@@ -790,7 +807,7 @@ export class DuckHuntEngine {
 
     this.dogCurrentY = -2.2;
     this.dogTargetY = -2.2;
-    this.dogGroup.position.set(0, this.dogCurrentY, -8.05);
+    this.dogGroup.position.set(0, this.dogCurrentY, this.getStageZ() - 0.05);
 
     const dogBrown = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.8, flatShading: true });
     const earBrown = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 });
@@ -873,7 +890,7 @@ export class DuckHuntEngine {
     this.dogState = 'intro';
     this.audioManager.playNesDogIntro();
 
-    this.dogGroup.position.set(-2.4, -1.45, -8.05);
+    this.dogGroup.position.set(-2.4, -1.45, this.getStageZ() - 0.05);
     this.dogCurrentY = -1.45;
     this.dogTargetY = -1.45;
     if (this.dogPaws) this.dogPaws.visible = false;

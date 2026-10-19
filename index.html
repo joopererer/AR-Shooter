@@ -47,35 +47,56 @@
     <!-- 第3层 (顶层 z-index: 10): HUD 2D 交互层 -->
     <div id="hud">
       <!-- 顶部信息栏 -->
+      <!-- 顶部信息栏 (通透、轻量、无重叠) -->
       <header id="top-bar">
-        <button id="hub-btn" class="hud-mode-pill hub-entry-pill" title="打开游戏大厅选择模式">
-          <span class="hub-pill-icon">🏠</span>
-          <span class="hub-pill-text">大厅</span>
-        </button>
-
-        <div class="hud-card score-card" id="modern-score-card">
-          <span class="label">SCORE</span>
-          <span id="score-val" class="value">0</span>
+        <div class="top-bar-left">
+          <button id="hub-btn" class="hud-mode-pill hub-entry-pill" title="打开游戏大厅选择模式">
+            <span class="hub-pill-icon">🏠</span>
+            <span class="hub-pill-text">大厅</span>
+          </button>
+          <button id="game-mode-btn" class="hud-mode-pill mode-highlight" title="点击切换玩法模式">
+            <span id="game-mode-icon">🌲</span>
+            <span id="game-mode-text">荒野狩猎</span>
+          </button>
         </div>
 
-        <div class="hud-center-status" id="modern-center-status">
-          <span id="status-badge" class="badge">RADAR ACTIVE</span>
-          <div class="mode-tags-row">
-            <button id="game-mode-btn" class="hud-mode-pill mode-highlight" title="点击切换玩法模式">
-              <span id="game-mode-icon">🌲</span>
-              <span id="game-mode-text">荒野狩猎</span>
-            </button>
-            <button id="mode-switch-btn" class="hud-mode-pill" title="切换空间位移控制模式">
-              <span id="mode-pill-icon">🕹️</span>
-              <span id="mode-pill-text">摇杆推进</span>
-            </button>
-            <span id="sensor-mode" class="mode-tag">GYRO</span>
+        <div class="top-bar-center" id="top-center-telemetry">
+          <!-- 幽灵模式铁围栏耐久条 -->
+          <div id="fence-hp-bar-container" class="telemetry-bar-box hidden">
+            <span class="telemetry-label">🛡️ 铁栏耐久</span>
+            <div class="telemetry-progress-track">
+              <div id="fence-hp-fill" class="telemetry-progress-fill fence-fill" style="width: 100%;"></div>
+            </div>
+            <span id="fence-hp-text" class="telemetry-val">100%</span>
+          </div>
+
+          <!-- 星际模式能量护盾条 -->
+          <div id="shield-hp-bar-container" class="telemetry-bar-box hidden">
+            <span class="telemetry-label">⚡ 战机护盾</span>
+            <div class="telemetry-progress-track shield-track">
+              <div id="shield-hp-fill" class="telemetry-progress-fill shield-fill" style="width: 100%;"></div>
+            </div>
+            <span id="shield-hp-text" class="telemetry-val">100%</span>
+          </div>
+
+          <!-- 普通模式状态指示 -->
+          <div id="general-status-box" class="general-status-box">
+            <span id="status-badge" class="badge">RADAR ACTIVE</span>
           </div>
         </div>
 
-        <div class="hud-card targets-card" id="modern-targets-card">
-          <span class="label">TARGETS</span>
-          <span id="targets-val" class="value">0</span>
+        <div class="top-bar-right" id="modern-stats-wrapper">
+          <div class="hud-card compact-stat-card">
+            <div class="stat-unit">
+              <span class="mini-label">SCORE</span>
+              <span id="score-val" class="mini-val">0</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-unit">
+              <span class="mini-label">TARGETS</span>
+              <span id="targets-val" class="mini-val targets-glow">5</span>
+            </div>
+          </div>
         </div>
       </header>
 

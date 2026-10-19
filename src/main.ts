@@ -63,16 +63,30 @@ class ArShooterGame {
   private scoreValEl: HTMLElement;
   private targetsValEl: HTMLElement;
   private statusBadgeEl: HTMLElement;
-  private sensorModeEl: HTMLElement;
+  private sensorModeEl: HTMLElement | null;
   private gameModeBtnEl: HTMLElement;
   private gameModeIconEl: HTMLElement;
   private gameModeTextEl: HTMLElement;
-  private modeSwitchBtnEl: HTMLElement;
-  private modePillIconEl: HTMLElement;
-  private modePillTextEl: HTMLElement;
-  private modernScoreCardEl: HTMLElement;
-  private modernCenterStatusEl: HTMLElement;
-  private modernTargetsCardEl: HTMLElement;
+  private modeSwitchBtnEl: HTMLElement | null;
+  private modePillIconEl: HTMLElement | null;
+  private modePillTextEl: HTMLElement | null;
+  private modernScoreCardEl: HTMLElement | null;
+  private modernCenterStatusEl: HTMLElement | null;
+  private modernTargetsCardEl: HTMLElement | null;
+
+  // 顶栏实时健康与护盾监控 DOM
+  private fenceHpContainerEl: HTMLElement | null;
+  private fenceHpFillEl: HTMLElement | null;
+  private fenceHpTextEl: HTMLElement | null;
+  private shieldHpContainerEl: HTMLElement | null;
+  private shieldHpFillEl: HTMLElement | null;
+  private shieldHpTextEl: HTMLElement | null;
+  private generalStatusBoxEl: HTMLElement | null;
+
+  // 耐久与护盾数值
+  private fenceHealth: number = 100;
+  private shieldHealth: number = 100;
+
   private crosshairEl: HTMLElement;
   private lockHintEl: HTMLElement;
   private friendlyBadgeEl: HTMLElement;
@@ -128,16 +142,25 @@ class ArShooterGame {
     this.scoreValEl = document.getElementById('score-val')!;
     this.targetsValEl = document.getElementById('targets-val')!;
     this.statusBadgeEl = document.getElementById('status-badge')!;
-    this.sensorModeEl = document.getElementById('sensor-mode')!;
+    this.sensorModeEl = document.getElementById('sensor-mode');
     this.gameModeBtnEl = document.getElementById('game-mode-btn')!;
     this.gameModeIconEl = document.getElementById('game-mode-icon')!;
     this.gameModeTextEl = document.getElementById('game-mode-text')!;
-    this.modeSwitchBtnEl = document.getElementById('mode-switch-btn')!;
-    this.modePillIconEl = document.getElementById('mode-pill-icon')!;
-    this.modePillTextEl = document.getElementById('mode-pill-text')!;
-    this.modernScoreCardEl = document.getElementById('modern-score-card')!;
-    this.modernCenterStatusEl = document.getElementById('modern-center-status')!;
-    this.modernTargetsCardEl = document.getElementById('modern-targets-card')!;
+    this.modeSwitchBtnEl = document.getElementById('mode-switch-btn');
+    this.modePillIconEl = document.getElementById('mode-pill-icon');
+    this.modePillTextEl = document.getElementById('mode-pill-text');
+    this.modernScoreCardEl = document.getElementById('modern-score-card');
+    this.modernCenterStatusEl = document.getElementById('modern-center-status');
+    this.modernTargetsCardEl = document.getElementById('modern-targets-card');
+
+    this.fenceHpContainerEl = document.getElementById('fence-hp-bar-container');
+    this.fenceHpFillEl = document.getElementById('fence-hp-fill');
+    this.fenceHpTextEl = document.getElementById('fence-hp-text');
+    this.shieldHpContainerEl = document.getElementById('shield-hp-bar-container');
+    this.shieldHpFillEl = document.getElementById('shield-hp-fill');
+    this.shieldHpTextEl = document.getElementById('shield-hp-text');
+    this.generalStatusBoxEl = document.getElementById('general-status-box');
+
     this.crosshairEl = document.getElementById('crosshair')!;
     this.lockHintEl = document.getElementById('lock-hint')!;
     this.friendlyBadgeEl = document.getElementById('friendly-warning-badge')!;
@@ -226,7 +249,8 @@ class ArShooterGame {
     this.entityManager = new EntityManager(
       this.scene,
       () => this.handlePlayerHitByEnemy(),
-      () => this.audioManager.playEnemyLaserFire()
+      () => this.audioManager.playEnemyLaserFire(),
+      (dmg) => this.handleFenceDamaged(dmg)
     );
     this.weaponManager = new WeaponManager(this.camera, (cfg) => this.onWeaponSwitched(cfg));
     this.cockpitManager = new CockpitManager(this.camera);
@@ -384,7 +408,7 @@ class ArShooterGame {
     });
 
     // 空间位移模式切换 (摇杆推进 / WebXR 空间走动)
-    this.modeSwitchBtnEl.addEventListener('click', (e) => {
+    this.modeSwitchBtnEl?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.cycleLocomotionMode();
     });
@@ -517,9 +541,12 @@ class ArShooterGame {
       this.weaponManager.setVisible(false);
 
       // 2. 隐藏 360 度独有 HUD 与控制部件
-      this.modernScoreCardEl.classList.add('hidden');
-      this.modernCenterStatusEl.classList.add('hidden');
-      this.modernTargetsCardEl.classList.add('hidden');
+      this.modernScoreCardEl?.classList.add('hidden');
+      this.modernCenterStatusEl?.classList.add('hidden');
+      this.modernTargetsCardEl?.classList.add('hidden');
+      this.fenceHpContainerEl?.classList.add('hidden');
+      this.shieldHpContainerEl?.classList.add('hidden');
+      this.generalStatusBoxEl?.classList.add('hidden');
       this.peekControllerEl.classList.add('hidden');
       this.weaponDockEl.classList.add('hidden');
       this.virtualJoystick.setVisible(false);
@@ -544,9 +571,9 @@ class ArShooterGame {
       this.flyAwayBannerEl.classList.add('hidden');
 
       // 2. 恢复 360 度沙盒 HUD 与控制部件
-      this.modernScoreCardEl.classList.remove('hidden');
-      this.modernCenterStatusEl.classList.remove('hidden');
-      this.modernTargetsCardEl.classList.remove('hidden');
+      this.modernScoreCardEl?.classList.remove('hidden');
+      this.modernCenterStatusEl?.classList.remove('hidden');
+      this.modernTargetsCardEl?.classList.remove('hidden');
       this.peekControllerEl.classList.remove('hidden');
       this.weaponDockEl.classList.remove('hidden');
       this.virtualJoystick.setVisible(true);
@@ -558,21 +585,58 @@ class ArShooterGame {
 
   private applyCurrentModeContent(mode: GameMode): void {
     this.entityManager.setMode(mode);
+    this.fenceHealth = 100;
+    this.shieldHealth = 100;
+    if (this.fenceHpFillEl) {
+      this.fenceHpFillEl.style.width = '100%';
+      this.fenceHpFillEl.style.background = 'linear-gradient(90deg, #10b981, #06b6d4)';
+    }
+    if (this.fenceHpTextEl) this.fenceHpTextEl.textContent = '100%';
+    if (this.shieldHpFillEl) {
+      this.shieldHpFillEl.style.width = '100%';
+      this.shieldHpFillEl.style.background = 'linear-gradient(90deg, #00f3ff, #3b82f6)';
+    }
+    if (this.shieldHpTextEl) this.shieldHpTextEl.textContent = '100%';
+
     if (mode === 'hunting') {
       this.environmentManager.initHuntingEnvironment();
       this.entityManager.initHuntingEcosystem();
       this.cockpitManager.setVisible(false);
       this.weaponManager.setVisible(true);
+
+      this.generalStatusBoxEl?.classList.remove('hidden');
+      this.fenceHpContainerEl?.classList.add('hidden');
+      this.shieldHpContainerEl?.classList.add('hidden');
+
+      this.virtualJoystick.setVisible(true);
+      this.peekControllerEl.classList.remove('hidden');
     } else if (mode === 'scifi') {
       this.environmentManager.initSciFiEnvironment();
       this.entityManager.initSciFiEcosystem();
       this.cockpitManager.setVisible(true);
       this.weaponManager.setVisible(false);
+
+      this.generalStatusBoxEl?.classList.add('hidden');
+      this.fenceHpContainerEl?.classList.add('hidden');
+      this.shieldHpContainerEl?.classList.remove('hidden');
+
+      this.virtualJoystick.setVisible(true);
+      this.peekControllerEl.classList.remove('hidden');
     } else if (mode === 'ghost') {
       this.environmentManager.initHalloweenEnvironment();
       this.entityManager.initGhostEcosystem();
       this.cockpitManager.setVisible(false);
       this.weaponManager.setVisible(true);
+
+      // 幽灵猎手：圆形铁围栏防守战
+      this.generalStatusBoxEl?.classList.add('hidden');
+      this.fenceHpContainerEl?.classList.remove('hidden');
+      this.shieldHpContainerEl?.classList.add('hidden');
+
+      // 玩家被限制在圆形铁围栏内：不能前进，只能 360 度旋转射击
+      this.virtualJoystick.setVisible(false);
+      this.peekControllerEl.classList.add('hidden');
+      this.playerRig.position.set(0, 0, 0);
     }
     this.updateTargetCountUI();
   }
@@ -779,15 +843,70 @@ class ArShooterGame {
     }
   }
 
+  private handleFenceDamaged(damage: number): void {
+    if (this.modeManager.getMode() !== 'ghost' || !this.isGameRunning) return;
+    this.fenceHealth = Math.max(0, this.fenceHealth - damage);
+    if (this.fenceHpFillEl) {
+      this.fenceHpFillEl.style.width = `${this.fenceHealth}%`;
+      if (this.fenceHealth <= 30) {
+        this.fenceHpFillEl.style.background = 'linear-gradient(90deg, #dc2626, #ef4444)';
+      } else {
+        this.fenceHpFillEl.style.background = 'linear-gradient(90deg, #10b981, #06b6d4)';
+      }
+    }
+    if (this.fenceHpTextEl) {
+      this.fenceHpTextEl.textContent = `${this.fenceHealth}%`;
+    }
+
+    this.environmentManager.flashFenceDamage();
+    this.audioManager.playShipShieldHit();
+    this.triggerFriendlyWarningFlash();
+    this.showHitPopup(`⚠️ 铁围栏遭猛攻 -${damage}% 耐久！`, true, 'friendly-penalty');
+
+    if (this.fenceHealth <= 0) {
+      this.handleGameOver('铁围栏已彻底破损，防线失守！');
+    }
+  }
+
   private handlePlayerHitByEnemy(): void {
+    if (!this.isGameRunning) return;
     if (this.modeManager.getMode() === 'scifi') {
       this.cockpitManager.triggerShieldHit();
+      this.shieldHealth = Math.max(0, this.shieldHealth - 20);
+      if (this.shieldHpFillEl) {
+        this.shieldHpFillEl.style.width = `${this.shieldHealth}%`;
+        if (this.shieldHealth <= 30) {
+          this.shieldHpFillEl.style.background = 'linear-gradient(90deg, #dc2626, #ef4444)';
+        } else {
+          this.shieldHpFillEl.style.background = 'linear-gradient(90deg, #00f3ff, #3b82f6)';
+        }
+      }
+      if (this.shieldHpTextEl) {
+        this.shieldHpTextEl.textContent = `${this.shieldHealth}%`;
+      }
+      if (this.shieldHealth <= 0) {
+        this.handleGameOver('战机护盾过载损毁，机体坠毁！');
+        return;
+      }
     }
     this.audioManager.playShipShieldHit();
     this.triggerFriendlyWarningFlash();
     this.score = Math.max(0, this.score - 150);
     this.scoreValEl.textContent = this.score.toString();
     this.showHitPopup('⚠️ 战机护盾遭受等离子轰击 -150', true, 'friendly-penalty');
+  }
+
+  private handleGameOver(reason: string): void {
+    this.isGameRunning = false;
+    this.audioManager.playNesGameOver();
+    this.modeManager.updateHighScore(this.modeManager.getMode(), this.score);
+    const bestScore = this.modeManager.getHighScore(this.modeManager.getMode());
+
+    this.nesModalTitleEl.textContent = reason;
+    this.nesFinalScoreEl.textContent = this.score.toString().padStart(6, '0');
+    this.nesFinalRoundEl.textContent = '-';
+    this.nesFinalBestEl.textContent = bestScore.toString().padStart(6, '0');
+    this.nesGameoverModalEl.classList.remove('hidden');
   }
 
   private cycleLocomotionMode(): void {
@@ -800,20 +919,26 @@ class ArShooterGame {
 
   private updateModeUI(): void {
     if (this.locomotionMode === 'webxr') {
-      this.modePillIconEl.textContent = '👓';
-      this.modePillTextEl.textContent = 'WebXR空间';
+      if (this.modePillIconEl) this.modePillIconEl.textContent = '👓';
+      if (this.modePillTextEl) this.modePillTextEl.textContent = 'WebXR空间';
       this.virtualJoystick.setVisible(false);
-      this.sensorModeEl.textContent = '6DoF XR';
-      this.sensorModeEl.style.color = '#10b981';
-    } else {
-      this.modePillIconEl.textContent = '🕹️';
-      this.modePillTextEl.textContent = '摇杆推进';
-      const cfg = this.modeManager.getModeConfig();
-      if (!cfg.isRetroLightGun) {
-        this.virtualJoystick.setVisible(true);
+      if (this.sensorModeEl) {
+        this.sensorModeEl.textContent = '6DoF XR';
+        this.sensorModeEl.style.color = '#10b981';
       }
-      this.sensorModeEl.textContent = '6DoF HYBRID';
-      this.sensorModeEl.style.color = '#00f3ff';
+    } else {
+      if (this.modePillIconEl) this.modePillIconEl.textContent = '🕹️';
+      if (this.modePillTextEl) this.modePillTextEl.textContent = '摇杆推进';
+      const cfg = this.modeManager.getModeConfig();
+      if (!cfg.isRetroLightGun && this.modeManager.getMode() !== 'ghost') {
+        this.virtualJoystick.setVisible(true);
+      } else {
+        this.virtualJoystick.setVisible(false);
+      }
+      if (this.sensorModeEl) {
+        this.sensorModeEl.textContent = '6DoF HYBRID';
+        this.sensorModeEl.style.color = '#00f3ff';
+      }
     }
   }
 
@@ -844,12 +969,16 @@ class ArShooterGame {
   private handleSensorModeChange(mode: SensorMode): void {
     if (this.locomotionMode === 'webxr') return;
     if (mode === 'gyro') {
-      this.sensorModeEl.textContent = '6DoF HYBRID';
-      this.sensorModeEl.style.color = '#00f3ff';
+      if (this.sensorModeEl) {
+        this.sensorModeEl.textContent = '6DoF HYBRID';
+        this.sensorModeEl.style.color = '#00f3ff';
+      }
       this.statusBadgeEl.textContent = 'AR SENSORS OK';
     } else {
-      this.sensorModeEl.textContent = 'TOUCH / MOUSE';
-      this.sensorModeEl.style.color = '#ffaa00';
+      if (this.sensorModeEl) {
+        this.sensorModeEl.textContent = 'TOUCH / MOUSE';
+        this.sensorModeEl.style.color = '#ffaa00';
+      }
       this.statusBadgeEl.textContent = 'MANUAL MODE';
     }
   }
@@ -1052,7 +1181,7 @@ class ArShooterGame {
 
       this.entityManager.update(delta, activeCam);
       this.weaponManager.update(delta);
-      this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector());
+      this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector(), this.sliderPeekOffset);
       this.updateLasers(delta);
       this.updateSmartReticle();
 

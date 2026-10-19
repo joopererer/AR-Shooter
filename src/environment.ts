@@ -146,18 +146,26 @@ export class EnvironmentManager {
    * 360° 全景环绕分布的自然掩体
    */
   private build360HuntingObstacles(): void {
-    // 360° 分布 10 个战略掩体点位
+    // 360° 全方位分布自然掩体：中心 6m 范围内绝对净空，正前方留出开阔射击走廊，掩体位于 7.5m~14m
     const configs: { type: 'tree' | 'rock' | 'bush'; angle: number; dist: number }[] = [
-      { type: 'tree', angle: 0.2, dist: 5.5 },
-      { type: 'rock', angle: 0.8, dist: 6.2 },
-      { type: 'bush', angle: 1.4, dist: 5.8 },
-      { type: 'tree', angle: 2.1, dist: 7.0 },
-      { type: 'rock', angle: 2.8, dist: 5.2 },
-      { type: 'bush', angle: 3.5, dist: 6.5 },
-      { type: 'tree', angle: 4.2, dist: 5.8 },
-      { type: 'rock', angle: 4.9, dist: 6.0 },
-      { type: 'tree', angle: 5.5, dist: 7.2 },
-      { type: 'rock', angle: 6.0, dist: 5.4 },
+      // 正前偏右与东部 (East, 30°~90°)
+      { type: 'tree', angle: 0.65, dist: 9.2 },
+      { type: 'rock', angle: 1.15, dist: 8.4 },
+      { type: 'bush', angle: 1.57, dist: 7.8 },
+      // 东南与背后偏右 (120°~165°)
+      { type: 'tree', angle: 2.1, dist: 8.8 },
+      { type: 'rock', angle: 2.65, dist: 9.5 },
+      // 转身正后方林带 (South, 180°/PI，丰满视界，不留空档)
+      { type: 'tree', angle: 3.14, dist: 8.2 },
+      { type: 'rock', angle: 3.45, dist: 10.5 },
+      { type: 'bush', angle: 3.85, dist: 7.9 },
+      // 西南与西部 (West, 210°~270°)
+      { type: 'tree', angle: 4.35, dist: 9.0 },
+      { type: 'rock', angle: 4.75, dist: 8.6 },
+      { type: 'bush', angle: 5.15, dist: 7.6 },
+      // 西北与正前偏左 (300°~340°)
+      { type: 'tree', angle: 5.65, dist: 9.4 },
+      { type: 'rock', angle: 5.95, dist: 8.5 },
     ];
 
     configs.forEach((cfg, idx) => {
@@ -406,25 +414,115 @@ export class EnvironmentManager {
     this.groundMesh.position.set(0, -1.5, 0);
     this.rootGroup.add(this.groundMesh);
 
-    // 2. 360° 环绕分布的墓园墓碑、枯萎死树与发光南瓜
+    // 2. 玩家所在的 360° 圆形哥特铁围栏庇护所 (R = 3.0m)
+    this.buildCircularIronFence();
+
+    // 3. 360° 环绕分布在铁栏外的墓碑、枯萎老树与南瓜灯 (R >= 6.5m)
     this.build360HalloweenObstacles();
 
-    // 3. 360° 浮空鬼火/冷火流光粒子 (Will-o'-the-wisps)
+    // 4. 360° 浮空鬼火冷焰粒子 (Will-o'-the-wisps)
     this.buildHalloweenGhostFire();
+  }
+
+  private fenceMat?: THREE.MeshStandardMaterial;
+
+  /**
+   * 构造 360° 圆形哥特铁围栏庇护所 (半径 R = 3.0m, 高 1.4m)
+   */
+  private buildCircularIronFence(): void {
+    const radius = 3.0;
+    const picketCount = 36;
+    const fenceGroup = new THREE.Group();
+    fenceGroup.position.set(0, -1.5, 0);
+
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.35,
+    });
+    this.fenceMat = ironMat;
+
+    // 上下两道圆弧铁横梁
+    [0.35, 1.15].forEach((railY) => {
+      const railGeo = new THREE.TorusGeometry(radius, 0.025, 6, 48);
+      const rail = new THREE.Mesh(railGeo, ironMat);
+      rail.rotation.x = Math.PI / 2;
+      rail.position.y = railY;
+      fenceGroup.add(rail);
+    });
+
+    // 36 根带尖锐枪头矛尖的垂直铸铁铁栏杆
+    const picketGeo = new THREE.CylinderGeometry(0.022, 0.022, 1.35, 5);
+    const spearGeo = new THREE.ConeGeometry(0.045, 0.16, 5);
+
+    for (let i = 0; i < picketCount; i++) {
+      const angle = (i / picketCount) * Math.PI * 2;
+      const px = Math.sin(angle) * radius;
+      const pz = -Math.cos(angle) * radius;
+
+      const picket = new THREE.Mesh(picketGeo, ironMat);
+      picket.position.set(px, 0.7, pz);
+      fenceGroup.add(picket);
+
+      const spear = new THREE.Mesh(spearGeo, ironMat);
+      spear.position.set(px, 1.42, pz);
+      fenceGroup.add(spear);
+    }
+
+    // 8 根粗壮哥特灰石立柱与柱顶幽紫火灯笼
+    const pillarCount = 8;
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, flatShading: true });
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+
+    for (let i = 0; i < pillarCount; i++) {
+      const angle = (i / pillarCount) * Math.PI * 2;
+      const px = Math.sin(angle) * radius;
+      const pz = -Math.cos(angle) * radius;
+
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.55, 0.18), pillarMat);
+      post.position.set(px, 0.77, pz);
+      post.rotation.y = angle;
+      fenceGroup.add(post);
+
+      const lantern = new THREE.Mesh(new THREE.DodecahedronGeometry(0.09, 0), lanternMat);
+      lantern.position.set(px, 1.62, pz);
+      fenceGroup.add(lantern);
+    }
+
+    // 围栏内圆形青石地面 (Inner Sanctuary Cobblestone Circle)
+    const floorGeo = new THREE.CircleGeometry(radius - 0.05, 36);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x1e1b4b,
+      roughness: 0.9,
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.02;
+    fenceGroup.add(floor);
+
+    this.rootGroup.add(fenceGroup);
+  }
+
+  public flashFenceDamage(): void {
+    if (!this.fenceMat) return;
+    this.fenceMat.color.setHex(0xef4444);
+    setTimeout(() => {
+      if (this.fenceMat) this.fenceMat.color.setHex(0x1e293b);
+    }, 280);
   }
 
   private build360HalloweenObstacles(): void {
     const items: { type: 'tombstone' | 'tree' | 'pumpkin'; angle: number; dist: number }[] = [
-      { type: 'tombstone', angle: 0.3, dist: 5.2 },
-      { type: 'tree', angle: 0.9, dist: 6.8 },
-      { type: 'pumpkin', angle: 1.5, dist: 4.8 },
-      { type: 'tombstone', angle: 2.2, dist: 5.5 },
-      { type: 'tombstone', angle: 2.9, dist: 6.0 },
-      { type: 'tree', angle: 3.6, dist: 7.2 },
-      { type: 'pumpkin', angle: 4.2, dist: 5.0 },
-      { type: 'tombstone', angle: 4.8, dist: 5.6 },
-      { type: 'tree', angle: 5.4, dist: 6.5 },
-      { type: 'pumpkin', angle: 6.1, dist: 4.6 },
+      { type: 'tombstone', angle: 0.4, dist: 7.2 },
+      { type: 'tree', angle: 1.1, dist: 8.8 },
+      { type: 'pumpkin', angle: 1.7, dist: 6.8 },
+      { type: 'tombstone', angle: 2.3, dist: 7.5 },
+      { type: 'tombstone', angle: 3.1, dist: 8.0 },
+      { type: 'tree', angle: 3.8, dist: 9.2 },
+      { type: 'pumpkin', angle: 4.4, dist: 7.0 },
+      { type: 'tombstone', angle: 5.0, dist: 7.6 },
+      { type: 'tree', angle: 5.7, dist: 8.5 },
+      { type: 'pumpkin', angle: 6.1, dist: 6.8 },
     ];
 
     items.forEach((item, idx) => {

@@ -55,6 +55,10 @@ export interface GameEntity {
   stateTimer: number;
   targetPos: THREE.Vector3;
   fireCooldown?: number; // 敌机开火冷却
+
+  // 幽灵猎手：圆形铁围栏攻击计时
+  fenceAttackCountdown?: number;
+  isAttackingFence?: boolean;
 }
 
 export interface EnemyProjectile {
@@ -96,6 +100,9 @@ export class EntityManager {
   private onPlayerHitCallback?: () => void;
   private onEnemyFireCallback?: () => void;
 
+  // 幽灵模式铁护栏受击破坏回调
+  private onFenceDamageCallback?: (damage: number) => void;
+
   // 临时辅助向量
   private readonly tempCamPos = new THREE.Vector3();
   private readonly tempCamDir = new THREE.Vector3();
@@ -104,13 +111,19 @@ export class EntityManager {
   constructor(
     scene: THREE.Scene,
     onPlayerHit?: () => void,
-    onEnemyFire?: () => void
+    onEnemyFire?: () => void,
+    onFenceDamage?: (damage: number) => void
   ) {
     this.scene = scene;
     this.scene.add(this.rootGroup);
     this.scene.add(this.projectileGroup);
     this.onPlayerHitCallback = onPlayerHit;
     this.onEnemyFireCallback = onEnemyFire;
+    this.onFenceDamageCallback = onFenceDamage;
+  }
+
+  public setFenceDamageCallback(cb: (damage: number) => void): void {
+    this.onFenceDamageCallback = cb;
   }
 
   public setMode(mode: GameMode): void {
@@ -122,66 +135,70 @@ export class EntityManager {
   // ==========================================================================
 
   /**
-   * 1. 荒野狩猎：360° 自然生灵群落 (目标猎物 + 友善禁射动物)
+   * 1. 荒野狩猎：360° 自然生灵群落 (360° 均匀环绕分布，初始距离玩家 > 7.0m 安全空间)
    */
   public initHuntingEcosystem(): void {
     this.clearAll();
     this.currentMode = 'hunting';
 
-    // 目标猎物：野鹿、野猪、巨熊
-    this.spawnEntity('deer');
-    this.spawnEntity('deer');
-    this.spawnEntity('boar');
-    this.spawnEntity('boar');
-    this.spawnEntity('bear');
+    // 8 个方位角均衡分布，确保转身 360 度均有动物 (正前方、正后方、左右及斜角)
+    const animalTypes: EntityType[] = [
+      'deer', 'deer', 'boar', 'boar', 'bear',
+      'dog', 'cow', 'cow', 'sheep', 'sheep'
+    ];
 
-    // 友善禁射生灵：敏捷猎犬、奶牛、绵羊
-    this.spawnEntity('dog');
-    this.spawnEntity('cow');
-    this.spawnEntity('cow');
-    this.spawnEntity('sheep');
-    this.spawnEntity('sheep');
+    animalTypes.forEach((type, idx) => {
+      // 基础角度 + 轻微随机扰动
+      const baseAngle = (idx / animalTypes.length) * Math.PI * 2 + THREE.MathUtils.randFloat(-0.2, 0.2);
+      const radius = type === 'bear' ? THREE.MathUtils.randFloat(9.5, 14.0) : THREE.MathUtils.randFloat(7.2, 13.5);
+      this.spawnEntity(type, baseAngle, radius);
+    });
   }
 
   /**
-   * 2. 星际防卫：360° 太空战机与异兽
+   * 2. 星际防卫：180° 前方战区太空战机 (Z < 0，方位角 ±70°，直观迎敌机动与闪身躲弹)
    */
   public initSciFiEcosystem(): void {
     this.clearAll();
     this.currentMode = 'scifi';
 
-    // 生成敌方太空战斗机 (Starfighters) 与脉冲异兽 (Aliens)
+    // 生成敌方太空战斗机 (Starfighters)：严格限制在正前方 180° 锥形战区
     for (let i = 0; i < 4; i++) {
-      this.spawnEntity('starfighter');
+      const angle = THREE.MathUtils.randFloat(-1.15, 1.15); // 正前方 ±66 度
+      const radius = THREE.MathUtils.randFloat(8.5, 14.5);
+      this.spawnEntity('starfighter', angle, radius);
     }
+    // 脉冲异兽 (Aliens)
     for (let i = 0; i < 3; i++) {
-      this.spawnEntity('alien');
+      const angle = THREE.MathUtils.randFloat(-1.25, 1.25);
+      const radius = THREE.MathUtils.randFloat(7.0, 11.0);
+      this.spawnEntity('alien', angle, radius);
     }
   }
 
   /**
-   * 3. 万圣夜惊魂：360° 万圣节主题怪物 (幽灵、蝙蝠、僵尸、南瓜怪)
+   * 3. 万圣夜惊魂：360° 圆形铁围栏围攻战 (怪物从外围 11m~16m 逼近围栏 R=3m)
    */
   public initGhostEcosystem(): void {
     this.clearAll();
     this.currentMode = 'ghost';
 
-    // 浮空幽灵、飞舞蝙蝠、地面蹒跚僵尸、蹦跳南瓜怪
-    this.spawnEntity('ghost');
-    this.spawnEntity('ghost');
-    this.spawnEntity('bat');
-    this.spawnEntity('bat');
-    this.spawnEntity('zombie');
-    this.spawnEntity('zombie');
-    this.spawnEntity('pumpkin');
-    this.spawnEntity('pumpkin');
+    const ghostTypes: EntityType[] = [
+      'ghost', 'ghost', 'bat', 'bat', 'zombie', 'zombie', 'pumpkin', 'pumpkin'
+    ];
+
+    ghostTypes.forEach((type, idx) => {
+      const baseAngle = (idx / ghostTypes.length) * Math.PI * 2 + THREE.MathUtils.randFloat(-0.25, 0.25);
+      const radius = THREE.MathUtils.randFloat(11.0, 15.5);
+      this.spawnEntity(type, baseAngle, radius);
+    });
   }
 
   // ==========================================================================
-  // 实体生成系统 (360° 环绕生成)
+  // 实体生成系统 (支持自定义方位角与生成半径)
   // ==========================================================================
 
-  public spawnEntity(type: EntityType): GameEntity {
+  public spawnEntity(type: EntityType, customAngle?: number, customRadius?: number): GameEntity {
     const group = new THREE.Group();
     const materials: THREE.Material[] = [];
     const legs: THREE.Mesh[] = [];
@@ -202,14 +219,20 @@ export class EntityManager {
 
     const groundY = -1.5;
 
-    // 360° 开放环绕生成 (0 ~ 2π)
-    const angle = Math.random() * Math.PI * 2;
-    const radius =
-      type === 'bear'
-        ? 8.0
-        : type === 'starfighter'
+    // 方位角与半径计算
+    let angle = customAngle !== undefined ? customAngle : Math.random() * Math.PI * 2;
+    // 星际战机默认严格保持在正前方 180° (Z < 0)
+    if (this.currentMode === 'scifi' && type === 'starfighter' && customAngle === undefined) {
+      angle = THREE.MathUtils.randFloat(-1.2, 1.2);
+    }
+
+    let radius = customRadius !== undefined ? customRadius : (
+      this.currentMode === 'ghost'
+        ? THREE.MathUtils.randFloat(11.0, 15.5)
+        : this.currentMode === 'hunting'
         ? THREE.MathUtils.randFloat(7.5, 14.0)
-        : THREE.MathUtils.randFloat(4.2, 9.5);
+        : (type === 'bear' ? 9.5 : type === 'starfighter' ? THREE.MathUtils.randFloat(8.5, 14.5) : THREE.MathUtils.randFloat(7.0, 11.0))
+    );
 
     const x = Math.sin(angle) * radius;
     const z = -Math.cos(angle) * radius;
@@ -217,11 +240,11 @@ export class EntityManager {
 
     if (!isGround) {
       if (type === 'bat') {
-        y = THREE.MathUtils.randFloat(0.5, 2.4);
+        y = THREE.MathUtils.randFloat(0.6, 2.5);
       } else if (type === 'starfighter') {
-        y = THREE.MathUtils.randFloat(-1.0, 3.5);
+        y = THREE.MathUtils.randFloat(0.2, 3.2);
       } else {
-        y = THREE.MathUtils.randFloat(-0.6, 2.2);
+        y = THREE.MathUtils.randFloat(-0.4, 2.2);
       }
     }
 
@@ -304,7 +327,7 @@ export class EntityManager {
       case 'pumpkin':
         this.buildPumpkinMesh(group, materials);
         speed = 2.4;
-        scoreValue = 140;
+        scoreValue = 200; // 南瓜虽无破坏力，但作为奖励得分目标获得 +200 分
         break;
     }
 
@@ -962,12 +985,18 @@ export class EntityManager {
    * 实体 AI 决策与转向平移
    */
   private updateEntityAI(e: GameEntity, delta: number): void {
-    // 1. 太空战斗机 (Starfighter)：战术盘旋 + 周期性向玩家座舱发射等离子弹
+    // 1. 太空战斗机 (Starfighter)：在正前方 180° 战区战术盘旋 + 周期性向玩家座舱发射等离子弹
     if (e.type === 'starfighter') {
       e.meshGroup.rotation.y += delta * 0.8;
-      // 环形战术机动轨道
-      e.position.x += Math.cos(performance.now() * 0.001 + e.speed) * delta * 2.5;
-      e.position.z += Math.sin(performance.now() * 0.001 + e.speed) * delta * 2.5;
+      // 战术机动：限制在正前方 (Z in [-16, -6], X in [-10, 10])
+      e.position.x += Math.cos(performance.now() * 0.001 + e.speed) * delta * 2.8;
+      e.position.z += Math.sin(performance.now() * 0.0008 + e.speed) * delta * 1.8;
+      // 强制约束在前方 180° 视野内
+      if (e.position.z > -5.5) e.position.z = -5.5;
+      if (e.position.z < -16.0) e.position.z = -16.0;
+      if (e.position.x > 11.0) e.position.x = 11.0;
+      if (e.position.x < -11.0) e.position.x = -11.0;
+
       e.meshGroup.position.copy(e.position);
       e.meshGroup.lookAt(this.tempCamPos);
 
@@ -975,7 +1004,7 @@ export class EntityManager {
       if (e.fireCooldown !== undefined) {
         e.fireCooldown -= delta;
         if (e.fireCooldown <= 0) {
-          e.fireCooldown = THREE.MathUtils.randFloat(3.2, 6.0);
+          e.fireCooldown = THREE.MathUtils.randFloat(3.2, 5.5);
           this.fireEnemyPlasma(e.position);
         }
       }
@@ -985,10 +1014,12 @@ export class EntityManager {
     // 2. 异兽 (Alien)
     if (e.type === 'alien') {
       e.meshGroup.rotation.y += delta * 1.5;
+      if (e.position.z > -4.5) e.position.z = -4.5;
+      e.meshGroup.position.copy(e.position);
       return;
     }
 
-    // 3. 幽灵 (Ghost)：准星手电筒夹角 < 12° (dot > 0.978) 显形逃逸
+    // 3. 幽灵 (Ghost)：准星手电筒夹角 < 12° (dot > 0.978) 显形逃逸，不破坏铁围栏
     if (e.type === 'ghost') {
       this.tempDir.subVectors(e.position, this.tempCamPos).normalize();
       const dot = this.tempCamDir.dot(this.tempDir);
@@ -1014,17 +1045,98 @@ export class EntityManager {
       return;
     }
 
-    // 4. 蝙蝠 (Bat)：在 3D 空中做俯冲曲线盘旋
+    // 4. 蝙蝠 (Bat)：万圣围栏攻防 (向铁围栏 R=3.1m 逼近，停驻攻击并倒计时；其他模式正常盘旋)
     if (e.type === 'bat') {
-      e.position.x += Math.sin(performance.now() * 0.0018 + e.speed) * delta * 3.5;
-      e.position.z += Math.cos(performance.now() * 0.0018 + e.speed) * delta * 3.5;
-      e.position.y += Math.sin(performance.now() * 0.003) * delta * 1.5;
-      e.meshGroup.position.copy(e.position);
-      e.meshGroup.lookAt(e.position.clone().add(new THREE.Vector3(1, 0, 1)));
+      if (this.currentMode === 'ghost') {
+        const distToCenter = Math.sqrt(e.position.x * e.position.x + e.position.z * e.position.z);
+        if (distToCenter > 3.2) {
+          // 向铁围栏俯冲逼近
+          const moveDir = new THREE.Vector3(-e.position.x, 0, -e.position.z).normalize();
+          e.position.addScaledVector(moveDir, e.speed * delta);
+          e.position.y += Math.sin(performance.now() * 0.003) * delta * 1.2;
+          e.meshGroup.position.copy(e.position);
+          e.meshGroup.lookAt(new THREE.Vector3(0, e.position.y, 0));
+          e.fenceAttackCountdown = undefined;
+          e.isAttackingFence = false;
+        } else {
+          // 悬停在铁围栏外圈 (R=3.2m)，开始倒计时攻击围栏 (3.0s)
+          e.isAttackingFence = true;
+          if (e.fenceAttackCountdown === undefined) {
+            e.fenceAttackCountdown = THREE.MathUtils.randFloat(3.0, 4.0);
+          }
+          e.fenceAttackCountdown -= delta;
+          // 扑翼爪抓动画
+          e.position.y = 1.2 + Math.sin(performance.now() * 0.008) * 0.15;
+          e.meshGroup.position.copy(e.position);
+          e.meshGroup.lookAt(new THREE.Vector3(0, e.position.y, 0));
+
+          if (e.fenceAttackCountdown <= 0) {
+            e.fenceAttackCountdown = 3.2; // 周期性攻击
+            if (this.onFenceDamageCallback) {
+              this.onFenceDamageCallback(10); // 蝙蝠每次抓挠 -10 HP
+            }
+          }
+        }
+      } else {
+        // 普通盘旋
+        e.position.x += Math.sin(performance.now() * 0.0018 + e.speed) * delta * 3.5;
+        e.position.z += Math.cos(performance.now() * 0.0018 + e.speed) * delta * 3.5;
+        e.position.y += Math.sin(performance.now() * 0.003) * delta * 1.5;
+        e.meshGroup.position.copy(e.position);
+        e.meshGroup.lookAt(e.position.clone().add(new THREE.Vector3(1, 0, 1)));
+      }
       return;
     }
 
-    // 5. 地面动物与僵尸：360° 原野漫步与转向
+    // 5. 南瓜怪 (Pumpkin)：在围栏外环跳跃 (R in [3.8, 9.0])，纯得分目标，不对铁栏造成破坏
+    if (e.type === 'pumpkin') {
+      const distToCenter = Math.sqrt(e.position.x * e.position.x + e.position.z * e.position.z);
+      if (distToCenter < 3.8) {
+        // 弹离围栏
+        const pushDir = new THREE.Vector3(e.position.x, 0, e.position.z).normalize();
+        e.position.addScaledVector(pushDir, 0.5 * delta);
+        e.meshGroup.position.x = e.position.x;
+        e.meshGroup.position.z = e.position.z;
+      }
+      return;
+    }
+
+    // 6. 僵尸 (Zombie)：万圣节圆形围栏防卫 (直奔围栏 R=3.1m，停在栏外倒计时 3.5~4.5s 拍打栏杆破坏)
+    if (e.type === 'zombie' && this.currentMode === 'ghost') {
+      const distToCenter = Math.sqrt(e.position.x * e.position.x + e.position.z * e.position.z);
+      if (distToCenter > 3.1) {
+        // 缓慢走向玩家所在的铁围栏
+        const dir = new THREE.Vector3(-e.position.x, 0, -e.position.z).normalize();
+        e.position.addScaledVector(dir, e.speed * delta);
+        e.meshGroup.position.copy(e.position);
+        e.meshGroup.lookAt(new THREE.Vector3(0, -1.5, 0));
+        e.fenceAttackCountdown = undefined;
+        e.isAttackingFence = false;
+      } else {
+        // 被铁围栏挡在外面，无法跨入！
+        const norm = new THREE.Vector3(e.position.x, 0, e.position.z).normalize();
+        e.position.x = norm.x * 3.1;
+        e.position.z = norm.z * 3.1;
+        e.meshGroup.position.copy(e.position);
+        e.meshGroup.lookAt(new THREE.Vector3(0, -1.5, 0));
+
+        e.isAttackingFence = true;
+        if (e.fenceAttackCountdown === undefined) {
+          e.fenceAttackCountdown = THREE.MathUtils.randFloat(3.5, 4.5);
+        }
+        e.fenceAttackCountdown -= delta;
+
+        if (e.fenceAttackCountdown <= 0) {
+          e.fenceAttackCountdown = 3.8; // 倒计时重置，继续猛砸
+          if (this.onFenceDamageCallback) {
+            this.onFenceDamageCallback(15); // 僵尸重击 -15 HP
+          }
+        }
+      }
+      return;
+    }
+
+    // 7. 荒野狩猎：地面动物 360° 原野漫步 (严格保持距玩家 > 5.5m 黄金安全距离，绝不在眼前贴脸突脸)
     const inStream = Math.abs(e.position.z - -4.5) < 1.6;
     let actualSpeed = e.speed;
     if (inStream) actualSpeed *= 0.6; // 溪流减速
@@ -1035,16 +1147,18 @@ export class EntityManager {
       if (e.type === 'deer' && inStream && Math.random() < 0.5) {
         e.state = 'drinking';
         if (e.headMesh) e.headMesh.rotation.x = Math.PI / 4; // 低头饮水
-      } else if (e.type === 'bear' || e.type === 'zombie') {
-        // 灰熊与僵尸：缓慢朝向玩家逼近
+      } else if (e.type === 'bear') {
+        // 灰熊：漫步巡逻，但与玩家保持至少 6.5m 距离
         e.state = 'wandering';
-        e.targetPos.copy(this.tempCamPos);
-        e.targetPos.y = -1.5;
+        const randAngle = Math.random() * Math.PI * 2;
+        const randDist = THREE.MathUtils.randFloat(7.0, 14.0);
+        e.targetPos.set(Math.sin(randAngle) * randDist, -1.5, -Math.cos(randAngle) * randDist);
       } else {
         e.state = 'wandering';
         if (e.headMesh) e.headMesh.rotation.x = 0;
         const randAngle = Math.random() * Math.PI * 2;
-        const randDist = THREE.MathUtils.randFloat(3.5, 9.5);
+        // 确保游走目标点在 6.0m ~ 14.5m，绝不靠近玩家中心 5.5m 以内
+        const randDist = THREE.MathUtils.randFloat(6.2, 14.0);
         e.targetPos.set(Math.sin(randAngle) * randDist, -1.5, -Math.cos(randAngle) * randDist);
       }
     }
@@ -1067,8 +1181,17 @@ export class EntityManager {
     if (distToTarget > 0.2) {
       this.tempDir.normalize();
       e.position.addScaledVector(this.tempDir, actualSpeed * delta);
-      e.meshGroup.position.copy(e.position);
 
+      // 安全缓冲区防御：如果动物无意中靠近玩家 (< 5.5m)，自动向外推挤
+      const distToPlayerOrigin = Math.sqrt(e.position.x * e.position.x + e.position.z * e.position.z);
+      if (distToPlayerOrigin < 5.5) {
+        const pushVector = new THREE.Vector3(e.position.x, 0, e.position.z).normalize();
+        if (pushVector.lengthSq() < 0.001) pushVector.set(0, 0, 1);
+        e.position.x = pushVector.x * 5.6;
+        e.position.z = pushVector.z * 5.6;
+      }
+
+      e.meshGroup.position.copy(e.position);
       const lookTarget = e.position.clone().add(this.tempDir);
       e.meshGroup.lookAt(lookTarget);
     }
@@ -1188,8 +1311,18 @@ export class EntityManager {
       };
     }
 
-    // 2. 扣除生命
+    // 2. 扣除生命与击退
     entity.health -= damage;
+
+    // 丧尸与夜蝠受击后退 2.6m，并重置/打断当前攻城倒计时
+    if (entity.type === 'zombie' || entity.type === 'bat') {
+      const knockDir = new THREE.Vector3(entity.position.x, 0, entity.position.z).normalize();
+      if (knockDir.lengthSq() < 0.001) knockDir.set(0, 0, 1);
+      entity.position.addScaledVector(knockDir, 2.6);
+      entity.meshGroup.position.copy(entity.position);
+      entity.fenceAttackCountdown = undefined;
+      entity.isAttackingFence = false;
+    }
 
     if (entity.health <= 0) {
       entity.isDying = true;
