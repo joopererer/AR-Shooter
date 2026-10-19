@@ -857,220 +857,6 @@ body {
 }
 
 /* ==========================================================================
-   移动端与横屏沉浸式作战布局 (Landscape Combat Layout)
-   - 摇杆位于左侧 1/4 (22vw)，开火位于右侧 3/4 (78vw)
-   - 闪身探头面板紧凑吸附在摇杆正上方
-   - 武器选择卡片横向排列于开火按钮正上方
-   - 定格校准与音量按钮置于底部中央，视野清爽且左右拇指互不干扰
-   ========================================================================== */
-
-@media (orientation: landscape) {
-  #top-bar {
-    padding: 6px env(safe-area-inset-right, 24px) 6px env(safe-area-inset-left, 24px);
-    height: 46px;
-  }
-
-  .hud-card {
-    padding: 3px 12px;
-  }
-
-  .hud-card .value {
-    font-size: 18px;
-  }
-
-  .hud-center-status {
-    gap: 3px;
-  }
-
-  .badge {
-    font-size: 9px;
-    padding: 2px 8px;
-  }
-
-  .hud-mode-pill {
-    padding: 2px 8px;
-    font-size: 10px;
-    height: 24px;
-  }
-
-  .mode-tag {
-    font-size: 9px;
-    padding: 2px 6px;
-  }
-
-  /* 1. 虚拟摇杆：横屏左侧 1/4 处 (22vw) */
-  #joystick-zone {
-    left: 22vw;
-    transform: translateX(-50%);
-    bottom: max(16px, env(safe-area-inset-bottom, 16px));
-    width: 106px;
-    height: 106px;
-    z-index: 20;
-  }
-
-  .joystick-base {
-    width: 106px;
-    height: 106px;
-  }
-
-  /* 2. 闪身探头面板：横屏依然严格吸附于摇杆正上方 */
-  #peek-controller {
-    left: 22vw;
-    transform: translateX(-50%);
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 16px)) + 114px);
-    width: 154px;
-    padding: 5px 8px;
-    gap: 4px;
-    border-radius: 10px;
-    z-index: 20;
-  }
-
-  .peek-header {
-    margin-bottom: 1px;
-  }
-
-  .peek-title {
-    font-size: 10px;
-  }
-
-  .peek-val {
-    font-size: 10px;
-  }
-
-  .peek-btn {
-    padding: 3px 4px;
-    font-size: 9px;
-  }
-
-  #peek-slider {
-    height: 3px;
-  }
-
-  /* 3. 底部控制栏：横屏下变为通宽容器，校准与音量居中放置 */
-  #bottom-bar {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100vw;
-    padding: 0 0 max(16px, env(safe-area-inset-bottom, 16px)) 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 14px;
-    pointer-events: none;
-    z-index: 22;
-  }
-
-  /* 定格校准与音量按钮：横屏居中紧凑胶囊排布 */
-  .secondary-btn {
-    pointer-events: auto;
-    width: 68px;
-    height: 36px;
-    border-radius: 10px;
-    font-size: 10px;
-    flex-direction: row;
-    gap: 4px;
-    background: var(--hud-bg-glass);
-    border: 1px solid var(--hud-border-glass);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  }
-
-  .secondary-btn .btn-icon {
-    width: 15px;
-    height: 15px;
-  }
-
-  /* 4. FIRE 开火按钮：横屏右侧 3/4 处 (78vw) */
-  .fire-btn {
-    pointer-events: auto;
-    position: absolute;
-    right: 22vw;
-    transform: translateX(50%);
-    bottom: max(16px, env(safe-area-inset-bottom, 16px));
-    width: 86px;
-    height: 86px;
-    margin: 0;
-    z-index: 25;
-  }
-
-  .fire-btn-inner {
-    width: 70px;
-    height: 70px;
-  }
-
-  .fire-icon {
-    width: 22px;
-    height: 22px;
-  }
-
-  .fire-text {
-    font-size: 12px;
-  }
-
-  /* 5. 武器切换基座：横屏下横向排列于开火按钮正上方 */
-  #weapon-dock {
-    right: 22vw;
-    transform: translateX(50%);
-    bottom: calc(max(16px, env(safe-area-inset-bottom, 16px)) + 96px);
-    flex-direction: row;
-    gap: 6px;
-    align-items: center;
-    z-index: 25;
-  }
-
-  .weapon-btn {
-    padding: 4px 8px;
-    min-width: 58px;
-    height: 32px;
-    gap: 4px;
-    border-radius: 6px;
-  }
-
-  .weapon-icon {
-    font-size: 13px;
-  }
-
-  .weapon-name {
-    font-size: 10px;
-  }
-
-  .shake-hint {
-    padding: 2px 6px;
-    font-size: 9px;
-    border-radius: 6px;
-  }
-
-  /* 弹窗在横屏下防溢出适配 */
-  .modal-card {
-    max-height: 90vh;
-    overflow-y: auto;
-    padding: 14px 24px;
-    max-width: 480px;
-  }
-
-  .modal-header {
-    margin-bottom: 8px;
-  }
-
-  .feature-tags {
-    margin-bottom: 8px;
-    gap: 6px;
-  }
-
-  .instructions-box {
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    font-size: 11px;
-  }
-
-  .start-btn {
-    padding: 10px 16px;
-    font-size: 14px;
-  }
-}
-
-/* ==========================================================================
    V2.0 核心功能视觉扩展 (模式、多武器、歪头探身与狙击镜)
    ========================================================================== */
 
@@ -1383,4 +1169,224 @@ body {
   color: #94a3b8;
   text-shadow: 0 0 8px rgba(148, 163, 184, 0.8);
   font-size: 16px;
+}
+
+/* ==========================================================================
+   横屏沉浸式作战布局 (Landscape Combat Layout) - 位于文件末尾确保绝对覆盖
+   - 左翼：闪身探头面板位于 left: max(16px, env(safe-area-inset-left, 16px)); bottom: 95px; (绝不超出左边界)
+   - 右翼：武器切换基座位于 right: max(16px, env(safe-area-inset-right, 16px)); bottom: 95px;
+     (左右两翼底部绝对高度 95px 完美水平对齐！)
+   - 左下：虚拟摇杆 (bottom: 16px, left: 16vw)
+   - 右下：FIRE 开火大按钮 (bottom: 16px, right: 16vw)
+   - 底部中央：定格校准与音效按钮居中紧凑排列
+   ========================================================================== */
+
+@media (orientation: landscape) {
+  #top-bar {
+    padding: 6px env(safe-area-inset-right, 24px) 6px env(safe-area-inset-left, 24px);
+    height: 46px;
+  }
+
+  .hud-card {
+    padding: 3px 12px;
+  }
+
+  .hud-card .value {
+    font-size: 18px;
+  }
+
+  .hud-center-status {
+    gap: 3px;
+  }
+
+  .badge {
+    font-size: 9px;
+    padding: 2px 8px;
+  }
+
+  .hud-mode-pill {
+    padding: 2px 8px;
+    font-size: 10px;
+    height: 24px;
+  }
+
+  .mode-tag {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  /* 1. 闪身探头面板：左侧安全边距，底边高度严格对齐右侧换枪按钮 (bottom: 95px) */
+  #peek-controller {
+    position: absolute;
+    left: max(16px, env(safe-area-inset-left, 16px));
+    bottom: 95px;
+    transform: none;
+    width: 146px;
+    padding: 6px 8px;
+    gap: 4px;
+    border-radius: 10px;
+    z-index: 20;
+  }
+
+  .peek-header {
+    margin-bottom: 2px;
+  }
+
+  .peek-title {
+    font-size: 10px;
+  }
+
+  .peek-val {
+    font-size: 10px;
+  }
+
+  .peek-btn {
+    padding: 3px 5px;
+    font-size: 9px;
+  }
+
+  #peek-slider {
+    height: 4px;
+  }
+
+  /* 2. 武器选择基座：右侧安全边距，与左侧探头面板严格水平对齐 (bottom: 95px) */
+  #weapon-dock {
+    position: absolute;
+    right: max(16px, env(safe-area-inset-right, 16px));
+    bottom: 95px;
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+    z-index: 20;
+  }
+
+  .weapon-btn {
+    padding: 4px 10px;
+    min-width: 82px;
+    height: 32px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+
+  .weapon-icon {
+    font-size: 12px;
+  }
+
+  .weapon-name {
+    font-size: 11px;
+  }
+
+  .shake-hint {
+    padding: 2px 6px;
+    font-size: 9px;
+    border-radius: 6px;
+  }
+
+  /* 3. 虚拟摇杆：位于左下操作区 (bottom: 16px)，位于探头面板下方 */
+  #joystick-zone {
+    position: absolute;
+    left: clamp(36px, 16vw, 130px);
+    transform: translateX(-50%);
+    bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    width: 106px;
+    height: 106px;
+    z-index: 20;
+  }
+
+  .joystick-base {
+    width: 106px;
+    height: 106px;
+  }
+
+  /* 4. FIRE 开火按钮：位于右下操作区 (bottom: 16px)，位于切枪按钮下方 */
+  .fire-btn {
+    pointer-events: auto;
+    position: absolute;
+    right: clamp(36px, 16vw, 130px);
+    transform: translateX(50%);
+    bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    width: 84px;
+    height: 84px;
+    margin: 0;
+    z-index: 25;
+  }
+
+  .fire-btn-inner {
+    width: 68px;
+    height: 68px;
+  }
+
+  .fire-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .fire-text {
+    font-size: 11px;
+  }
+
+  /* 5. 底部控制栏：横屏下变为通宽容器，校准与音量居中放置 */
+  #bottom-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    padding: 0 0 max(14px, env(safe-area-inset-bottom, 14px)) 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    pointer-events: none;
+    z-index: 22;
+  }
+
+  /* 定格校准与音量按钮：横屏居中紧凑胶囊排布 */
+  .secondary-btn {
+    pointer-events: auto;
+    width: 68px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 10px;
+    flex-direction: row;
+    gap: 4px;
+    background: var(--hud-bg-glass);
+    border: 1px solid var(--hud-border-glass);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .secondary-btn .btn-icon {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* 弹窗在横屏下防溢出适配 */
+  .modal-card {
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 14px 24px;
+    max-width: 480px;
+  }
+
+  .modal-header {
+    margin-bottom: 8px;
+  }
+
+  .feature-tags {
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+
+  .instructions-box {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .start-btn {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
 }

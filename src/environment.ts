@@ -13,6 +13,18 @@ export interface ObstacleEntity {
   colliderMeshes: THREE.Mesh[];
   position: THREE.Vector3;
   radius: number;
+  health: number;
+  maxHealth: number;
+  isDestroyed: boolean;
+}
+
+export interface ObstacleHitResult {
+  hit: boolean;
+  destroyed: boolean;
+  obstacle: ObstacleEntity;
+  damage: number;
+  remainingHealth: number;
+  name: string;
 }
 
 export class EnvironmentManager {
@@ -27,6 +39,8 @@ export class EnvironmentManager {
 
   // 格挡火花与碎屑粒子系统
   private sparkParticles: THREE.Points[] = [];
+  // 掩体崩解破片碎块系统
+  private debrisMeshes: { mesh: THREE.Mesh; velocity: THREE.Vector3; rotSpeed: THREE.Vector3; life: number; maxLife: number }[] = [];
 
   // 歪头探身视差状态 (Peek System)
   private currentPeekX: number = 0;
@@ -108,6 +122,9 @@ export class EnvironmentManager {
         colliderMeshes: [shieldMesh],
         position: shieldGroup.position.clone(),
         radius: 1.4,
+        health: 3,
+        maxHealth: 3,
+        isDestroyed: false,
       });
     }
   }
@@ -233,6 +250,7 @@ export class EnvironmentManager {
         colliders.push(bush);
       }
 
+      const initialHp = cfg.type === 'rock' ? 3 : cfg.type === 'tree' ? 4 : 1;
       this.rootGroup.add(group);
       this.obstacles.push({
         id: `obs_${idx}_${cfg.type}`,
@@ -241,6 +259,9 @@ export class EnvironmentManager {
         colliderMeshes: colliders,
         position: group.position.clone(),
         radius: cfg.type === 'tree' ? 1.5 : 1.3,
+        health: initialHp,
+        maxHealth: initialHp,
+        isDestroyed: false,
       });
     });
   }
@@ -258,7 +279,9 @@ export class EnvironmentManager {
 
     const allMeshes: THREE.Mesh[] = [];
     this.obstacles.forEach((obs) => {
-      obs.colliderMeshes.forEach((mesh) => allMeshes.push(mesh));
+      if (!obs.isDestroyed) {
+        obs.colliderMeshes.forEach((mesh) => allMeshes.push(mesh));
+      }
     });
 
     const intersects = raycaster.intersectObjects(allMeshes, false);
@@ -328,6 +351,122 @@ export class EnvironmentManager {
   }
 
   /**
+   * 掩体受击伤害与破坏破碎判定
+   */
+  public hitObstacle(obstacle: ObstacleEntity, damage: number = 1, hitPoint?: THREE.Vector3): ObstacleHitResult {
+    const point = hitPoint || obstacle.position.clone();
+    obstacle.health -= damage;
+
+    const nameMap: Record<string, string> = {
+      rock: '大岩石',
+      tree: '粗壮松树',
+      bush: '低矮灌木',
+      shield: '能量护盾',
+    };
+
+    if (obstacle.health <= 0) {
+      obstacle.isDestroyed = true;
+      // 触发崩解爆炸破片飞溅特效
+      this.createObstacleShatterDebris(point, obstacle.type);
+
+      // 从场景和活跃掩体列表中移除
+      this.rootGroup.remove(obstacle.meshGroup);
+      const idx = this.obstacles.indexOf(obstacle);
+      if (idx !== -1) {
+        this.obstacles.splice(idx, 1);
+      }
+
+      return {
+        hit: true,
+        destroyed: true,
+        obstacle,
+        damage,
+        remainingHealth: 0,
+        name: nameMap[obstacle.type] || '掩体',
+      };
+    }
+
+    // 尚未破坏：局部火星/碎屑飞溅，并触发受击震颤微动画
+    this.createObstacleHitSparks(point, obstacle.type);
+    obstacle.meshGroup.position.x += (Math.random() - 0.5) * 0.1;
+    setTimeout(() => {
+      if (!obstacle.isDestroyed) {
+        obstacle.meshGroup.position.copy(obstacle.position);
+      }
+    }, 60);
+
+    return {
+      hit: true,
+      destroyed: false,
+      obstacle,
+      damage,
+      remainingHealth: obstacle.health,
+      name: nameMap[obstacle.type] || '掩体',
+    };
+  }
+
+  /**
+   * 掩体彻底碎裂物理碎片抛射特效 (岩石崩碎、木料断裂、能量波扩散)
+   */
+  private createObstacleShatterDebris(pos: THREE.Vector3, type: 'tree' | 'rock' | 'bush' | 'shield'): void {
+    // 1. 迸射密集石粉/木屑烟尘
+    this.createObstacleHitSparks(pos, type);
+
+    // 2. 抛射 8~12 块实体三维多面体碎块
+    const pieceCount = type === 'bush' ? 6 : 10;
+    const color = type === 'tree' ? 0x6b4423 : type === 'shield' ? 0x00f3ff : 0x5a6577;
+
+    for (let i = 0; i < pieceCount; i++) {
+      let geo: THREE.BufferGeometry;
+      if (type === 'rock') {
+        geo = new THREE.DodecahedronGeometry(THREE.MathUtils.randFloat(0.12, 0.28), 0);
+      } else if (type === 'tree') {
+        geo = new THREE.BoxGeometry(0.1, THREE.MathUtils.randFloat(0.2, 0.45), 0.1);
+      } else if (type === 'shield') {
+        geo = new THREE.TetrahedronGeometry(0.18, 0);
+      } else {
+        geo = new THREE.PlaneGeometry(0.18, 0.18);
+      }
+
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        transparent: true,
+        opacity: 0.95,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+      mesh.position.x += THREE.MathUtils.randFloat(-0.3, 0.3);
+      mesh.position.y += THREE.MathUtils.randFloat(0.1, 0.6);
+      mesh.position.z += THREE.MathUtils.randFloat(-0.3, 0.3);
+
+      const angle = Math.random() * Math.PI * 2;
+      const spd = THREE.MathUtils.randFloat(2.5, 6.0);
+      const vel = new THREE.Vector3(
+        Math.cos(angle) * spd,
+        THREE.MathUtils.randFloat(2.5, 5.5),
+        Math.sin(angle) * spd
+      );
+
+      const rot = new THREE.Vector3(
+        THREE.MathUtils.randFloat(-8, 8),
+        THREE.MathUtils.randFloat(-8, 8),
+        THREE.MathUtils.randFloat(-8, 8)
+      );
+
+      this.rootGroup.add(mesh);
+      this.debrisMeshes.push({
+        mesh,
+        velocity: vel,
+        rotSpeed: rot,
+        life: 0.9,
+        maxLife: 0.9,
+      });
+    }
+  }
+
+  /**
    * 歪头探身视差控制 (Roll-to-Peek & UI Peek)
    * 结合陀螺仪横滚角与 UI 滑块设置相机 X 轴偏移 [-2.2m, +2.2m]
    */
@@ -384,6 +523,39 @@ export class EnvironmentManager {
         posArr[j3 + 2] += velArr[j3 + 2] * delta;
       }
       posAttr.needsUpdate = true;
+    }
+
+    // 4. 更新物理碎石/木屑碎块重力抛射与淡出
+    for (let i = this.debrisMeshes.length - 1; i >= 0; i--) {
+      const d = this.debrisMeshes[i];
+      d.life -= delta;
+
+      if (d.life <= 0) {
+        this.rootGroup.remove(d.mesh);
+        d.mesh.geometry.dispose();
+        (d.mesh.material as THREE.Material).dispose();
+        this.debrisMeshes.splice(i, 1);
+        continue;
+      }
+
+      // 重力加速度
+      d.velocity.y -= 9.8 * delta;
+      d.mesh.position.addScaledVector(d.velocity, delta);
+      d.mesh.rotation.x += d.rotSpeed.x * delta;
+      d.mesh.rotation.y += d.rotSpeed.y * delta;
+      d.mesh.rotation.z += d.rotSpeed.z * delta;
+
+      // 地面碰撞弹跳 (地面 Y = -1.5)
+      if (d.mesh.position.y < -1.45) {
+        d.mesh.position.y = -1.45;
+        d.velocity.y = -d.velocity.y * 0.35;
+        d.velocity.x *= 0.6;
+        d.velocity.z *= 0.6;
+      }
+
+      // 透明度淡出
+      const alpha = d.life / d.maxLife;
+      (d.mesh.material as THREE.MeshStandardMaterial).opacity = alpha;
     }
   }
 

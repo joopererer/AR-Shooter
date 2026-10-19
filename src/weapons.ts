@@ -12,6 +12,7 @@ export interface WeaponConfig {
   type: WeaponType;
   name: string;
   damage: number;
+  obstacleDamage: number;   // 掩体破坏力 (霰弹与穿甲狙对岩石/树木有超强碎裂效果)
   cooldown: number; // 秒
   pellets: number;  // 弹丸数 (霰弹枪为8)
   spread: number;   // 散布弧度
@@ -35,6 +36,7 @@ export class WeaponManager {
       type: 'rifle',
       name: '猎鹿步枪',
       damage: 1,
+      obstacleDamage: 1, // 点射剥落石屑，需 3 发破坏巨石
       cooldown: 0.28,
       pellets: 1,
       spread: 0.002,
@@ -44,7 +46,8 @@ export class WeaponManager {
     shotgun: {
       type: 'shotgun',
       name: '双管霰弹枪',
-      damage: 1, // 8颗弹丸命中多颗伤害爆炸
+      damage: 1,
+      obstacleDamage: 2, // 霰弹重型动能爆发，近距离 1~2 发轰碎巨石
       cooldown: 0.75,
       pellets: 8,
       spread: 0.085, // 宽散布面
@@ -54,7 +57,8 @@ export class WeaponManager {
     sniper: {
       type: 'sniper',
       name: '光学穿甲狙击',
-      damage: 3, // 一击秒杀大部分猎物
+      damage: 3,
+      obstacleDamage: 4, // 穿甲电磁弹：穿透掩体的同时一枪直接彻底轰碎巨石！
       cooldown: 1.5,
       pellets: 1,
       spread: 0.0005,

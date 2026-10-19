@@ -514,12 +514,29 @@ class ArShooterGame {
         }
       }
 
-      if (bulletBlocked && obsHit) {
-        // 掩体格挡！火花碎屑特效与沉闷格挡声
+      // 如果是穿甲狙击枪击中掩体，狙击弹穿透掩体的同时对掩体造成重创甚至直接打碎！
+      if (obsHit && obsHit.obstacle && cfg.penetratesCover) {
+        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, cfg.obstacleDamage, obsHit.point);
+        if (obsRes.destroyed) {
+          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
+          this.showHitPopup(`💥 穿甲贯穿！${obsRes.name}被轰碎`, false, 'blocked-hint');
+        }
+      }
+
+      if (bulletBlocked && obsHit && obsHit.obstacle) {
+        // 掩体格挡！扣除掩体耐久并判断是否崩碎
         endPoint = obsHit.point;
-        this.environmentManager.createObstacleHitSparks(obsHit.point, obsHit.obstacle?.type || 'rock');
-        this.audioManager.playObstacleHit();
-        this.showHitPopup('BLOCKED 掩体格挡', false, 'blocked-hint');
+        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, cfg.obstacleDamage, obsHit.point);
+
+        if (obsRes.destroyed) {
+          // 掩体耐久归零彻底碎裂！
+          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
+          this.showHitPopup(`💥 ${obsRes.name}崩塌碎裂！`, false, 'blocked-hint');
+        } else {
+          // 未彻底碎裂：播放格挡音并显示剩余耐久
+          this.audioManager.playObstacleHit();
+          this.showHitPopup(`🛡️ ${obsRes.name}耐久 [${obsRes.remainingHealth}/${obsRes.obstacle.maxHealth}]`, false, 'blocked-hint');
+        }
       } else if (entHit) {
         // 击中实体 (目标猎物 或 友善动物)
         endPoint = entHit.position.clone();
