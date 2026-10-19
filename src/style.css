@@ -1085,7 +1085,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, transparent 32vmin, rgba(3, 8, 20, 0.7) 42vmin, rgba(2, 6, 14, 0.85) 100%);
+  background: radial-gradient(circle at center, transparent 35vmin, rgba(0, 0, 0, 0.95) 37.5vmin, #000000 42vmin, #000000 100%);
   transition: opacity 0.2s ease;
 }
 
