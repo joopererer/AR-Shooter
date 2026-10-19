@@ -66,7 +66,8 @@ export class MonsterManager {
    * 半径 R in [6, 12] 米，仰角 -30度 ~ +45度，水平角 0 ~ 360度
    */
   public spawnMonster(): MonsterEntity {
-    const radius = THREE.MathUtils.randFloat(6, 12);
+    // 缩短生成半径至 2.8 ~ 6.2 米，使得空间走步或摇杆推进时近大远小肉眼极其明显
+    const radius = THREE.MathUtils.randFloat(2.8, 6.2);
     const minElev = THREE.MathUtils.degToRad(-30);
     const maxElev = THREE.MathUtils.degToRad(45);
     const elevation = THREE.MathUtils.randFloat(minElev, maxElev);
@@ -224,21 +225,21 @@ export class MonsterManager {
       this.tempMonsterDir.copy(m.currentPosition).sub(camera.position).normalize();
       const dot = this.tempCamDir.dot(this.tempMonsterDir);
 
-      // 使用宽域 Smoothstep 缓动曲线：
-      // dot >= 0.82 (中心 ~35度视场): 100% 不透明
-      // 0.50 <= dot < 0.82 (视口边缘向外): 连续 S 型曲线衰减到 0.0
-      // dot < 0.50: 完全透明 0.0
-      let targetOpacity = 0;
-      if (dot >= 0.82) {
+      // 3. FOV 点积边缘透明度控制：
+      // 只要怪物在相机前方视界 (dot >= 0.25) 或位于 5 米内，保持 100% 鲜艳可见；
+      // 仅在完全转至玩家脑后 (dot < -0.1) 时才做后方淡隐，彻底消除怪物离奇隐形的问题！
+      const distToCam = camera.position.distanceTo(m.currentPosition);
+      let targetOpacity = 1.0;
+      if (distToCam <= 5.0 || dot >= 0.25) {
         targetOpacity = 1.0;
-      } else if (dot >= 0.50) {
-        const t = (dot - 0.50) / (0.82 - 0.50);
-        targetOpacity = t * t * (3 - 2 * t); // Smoothstep 三次 Hermite 曲线
+      } else if (dot >= -0.1) {
+        const t = (dot - (-0.1)) / (0.25 - (-0.1));
+        targetOpacity = t * t * (3 - 2 * t);
       } else {
-        targetOpacity = 0;
+        targetOpacity = 0.0;
       }
 
-      // 时间阻尼平滑逼近 (Lerp)，彻底抹去帧间突变
+      // 时间阻尼平滑逼近 (Lerp)
       const lerpSpeed = Math.min(1.0, delta * 14);
       m.currentOpacity += (targetOpacity - m.currentOpacity) * lerpSpeed;
 

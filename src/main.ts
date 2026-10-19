@@ -118,27 +118,29 @@ class ArShooterGame {
     this.indicatorManager = new IndicatorManager('indicator-container');
     this.virtualJoystick = new VirtualJoystick('joystick-zone');
 
-    // 初始化 WebXR 管理器
+    // 初始化 WebXR 管理器 (进入前释放 WebRTC 摄像头避免独占冲突，退出后恢复)
     this.webxrManager = new WebXRManager(this.renderer, {
       onSessionStarted: () => {
         this.locomotionMode = 'webxr';
         this.updateModeUI();
         this.showStatusNotification('已开启 WebXR 真实空间行走');
-        // 隐藏常规视频背景（WebXR 自带原生相机图层穿透）
-        const video = document.getElementById('camera-bg');
-        if (video) video.style.opacity = '0';
       },
-      onSessionEnded: () => {
+      onSessionEnded: async () => {
         this.locomotionMode = 'joystick';
         this.updateModeUI();
-        this.showStatusNotification('已返回摇杆推进模式');
+        this.showStatusNotification('已恢复 WebRTC 摇杆推进模式');
+        // 恢复后置摄像头流
+        await this.cameraManager.initCamera();
         const video = document.getElementById('camera-bg');
-        if (video) video.style.opacity = '1';
+        if (video) video.style.display = 'block';
       },
-      onError: (err) => {
+      onError: async (err) => {
         this.showStatusNotification(`WebXR 异常: ${err.message}`);
         this.locomotionMode = 'joystick';
         this.updateModeUI();
+        await this.cameraManager.initCamera();
+        const video = document.getElementById('camera-bg');
+        if (video) video.style.display = 'block';
       },
     });
 
@@ -149,9 +151,20 @@ class ArShooterGame {
     this.bindEvents();
     this.checkSecurityContext();
 
-    // 9. 启动渲染循环 (Three.js WebXR 推荐使用 setAnimationLoop 兼容普通与 XR 帧)
+    // 9. 启动渲染循环
     this.animate = this.animate.bind(this);
     this.renderer.setAnimationLoop(this.animate);
+  }
+
+  /**
+   * 获取当前实际用于渲染与空间定位的相机
+   * (在 WebXR 激活时返回由 ARCore 管理的 XRCamera，否则返回主相机)
+   */
+  public getActiveCamera(): THREE.Camera {
+    if (this.renderer.xr.enabled && this.renderer.xr.isPresenting) {
+      return this.renderer.xr.getCamera();
+    }
+    return this.camera;
   }
 
   /**
@@ -246,22 +259,34 @@ class ArShooterGame {
    */
   private async cycleLocomotionMode(): Promise<void> {
     if (this.locomotionMode === 'joystick') {
-      // 尝试切换到 WebXR 6DoF 物理走动
       const isXRSupported = await this.webxrManager.checkSupport();
       if (isXRSupported) {
+        // 关键避坑：Android 摄像头硬件是排他的！
+        // 必须先释放 WebRTC 摄像头流，ARCore 才能成功获取摄像头硬件，否则会瞬间崩溃退出
+        this.cameraManager.stopCamera();
+        const video = document.getElementById('camera-bg') as HTMLVideoElement;
+        if (video) video.style.display = 'none';
+
         const hud = document.getElementById('hud') || undefined;
         const success = await this.webxrManager.startSession(hud);
         if (success) {
           return;
+        } else {
+          // 启动失败恢复 WebRTC
+          await this.cameraManager.initCamera();
+          if (video) video.style.display = 'block';
         }
       }
-      // 不支持或启动失败则切换到经典定点 3DoF
       this.showStatusNotification('当前设备未检测到 WebXR，转为定点 3DoF');
       this.locomotionMode = 'stationary';
       this.updateModeUI();
     } else if (this.locomotionMode === 'webxr') {
-      // 退出 WebXR 会话，切换到定点 3DoF
+      // 退出 WebXR 会话，恢复 WebRTC
       await this.webxrManager.endSession();
+      await this.cameraManager.initCamera();
+      const video = document.getElementById('camera-bg') as HTMLVideoElement;
+      if (video) video.style.display = 'block';
+
       this.locomotionMode = 'stationary';
       this.updateModeUI();
     } else {
@@ -284,7 +309,8 @@ class ArShooterGame {
     } else if (this.locomotionMode === 'webxr') {
       this.modePillIconEl.textContent = '🌐';
       this.modePillTextEl.textContent = 'WebXR实景';
-      this.virtualJoystick.setVisible(false);
+      // 在 WebXR 下同样开放摇杆，支持真实物理走动 + 摇杆双重位移！
+      this.virtualJoystick.setVisible(true);
       this.sensorModeEl.textContent = '6DoF SLAM';
     } else {
       this.modePillIconEl.textContent = '🎯';
@@ -348,8 +374,10 @@ class ArShooterGame {
       navigator.vibrate([25, 20, 35]);
     }
 
-    // 从屏幕中心检测射线命中
-    this.raycaster.setFromCamera(this.centerNdc, this.camera);
+    const activeCam = this.getActiveCamera();
+
+    // 从屏幕中心检测射线命中 (使用当前真实活动相机)
+    this.raycaster.setFromCamera(this.centerNdc, activeCam);
     const hitTarget = this.monsterManager.checkRayIntersection(this.raycaster);
 
     let endPoint: THREE.Vector3;
@@ -361,10 +389,10 @@ class ArShooterGame {
       this.handleHitFeedback(hitTarget, hitRes.killed || false);
       this.playHitSound();
     } else {
-      endPoint = this.camera.position.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(20));
+      endPoint = activeCam.position.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(20));
     }
 
-    this.createLaserBeam(this.camera.position, endPoint);
+    this.createLaserBeam(activeCam.position, endPoint);
   }
 
   /**
@@ -455,7 +483,8 @@ class ArShooterGame {
   private updateCrosshairLocking(): void {
     if (!this.isGameRunning) return;
 
-    this.raycaster.setFromCamera(this.centerNdc, this.camera);
+    const activeCam = this.getActiveCamera();
+    this.raycaster.setFromCamera(this.centerNdc, activeCam);
     const hitMonster = this.monsterManager.checkRayIntersection(this.raycaster);
 
     if (hitMonster) {
@@ -619,19 +648,20 @@ class ArShooterGame {
   private animate(): void {
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const elapsed = this.clock.getElapsedTime();
+    const activeCam = this.getActiveCamera();
 
     // 1. 如果不在 WebXR 模式下，更新自定义陀螺仪四元数
     if (!this.webxrManager.getIsActive()) {
       this.gyroController.update(delta);
     }
 
-    // 2. 摇杆模式下，处理空间位移推进 (前后左右走动靠近/远离怪物)
-    if (this.locomotionMode === 'joystick' && this.isGameRunning) {
+    // 2. 摇杆位移推进 (支持摇杆走动推进靠近怪物)
+    if (this.virtualJoystick.getIsVisible() && this.isGameRunning) {
       this.virtualJoystick.applyMovement(this.camera, delta, 3.6);
     }
 
-    // 3. 更新怪物动画、FOV 点积衰减与爆炸粒子
-    this.monsterManager.update(delta, elapsed, this.camera);
+    // 3. 更新怪物动画与 FOV 衰减 (使用当前真实活动相机)
+    this.monsterManager.update(delta, elapsed, activeCam);
 
     // 4. 更新激光束
     this.updateLasers(delta);
@@ -639,9 +669,9 @@ class ArShooterGame {
     // 5. 准星锁定目标检测
     this.updateCrosshairLocking();
 
-    // 6. 屏外边缘指示箭头更新 (距离与方位角随相机位移自适应)
+    // 6. 屏外边缘指示箭头更新 (使用当前真实相机的世界坐标计算距离与方位角)
     if (this.isGameRunning) {
-      this.indicatorManager.update(this.camera, this.monsterManager.getActiveMonsters());
+      this.indicatorManager.update(activeCam, this.monsterManager.getActiveMonsters());
     }
 
     // 7. 执行渲染
