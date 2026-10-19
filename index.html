@@ -28,7 +28,23 @@
     <!-- 第2层 (中层 z-index: 2): Three.js 透明渲染画布 -->
     <canvas id="ar-canvas"></canvas>
 
-    <!-- 第3层 (顶层 z-index: 3): HUD 2D 交互层 -->
+    <!-- 狙击枪 2X 光学瞄准镜全屏遮罩 (z-index: 3, 位于画布与 HUD 之间) -->
+    <div id="sniper-scope-overlay" class="sniper-scope-overlay hidden">
+      <div class="scope-vignette"></div>
+      <div class="scope-lens">
+        <div class="scope-cross-h"></div>
+        <div class="scope-cross-v"></div>
+        <div class="scope-circle-inner"></div>
+        <div class="scope-circle-outer"></div>
+        <div class="scope-range-lines"></div>
+        <div class="scope-telemetry top-left">ZOOM: 2.0X OPTICAL</div>
+        <div class="scope-telemetry top-right">PIERCING: ENGAGED</div>
+        <div class="scope-telemetry bottom-left">RADAR: ACTIVE</div>
+        <div id="scope-target-text" class="scope-telemetry bottom-right">TARGET: ACQUIRING</div>
+      </div>
+    </div>
+
+    <!-- 第3层 (顶层 z-index: 10): HUD 2D 交互层 -->
     <div id="hud">
       <!-- 顶部信息栏 -->
       <header id="top-bar">
@@ -164,22 +180,6 @@
           <span id="sound-text">音效</span>
         </button>
       </footer>
-    </div>
-
-    <!-- 狙击枪 2X 光学瞄准镜全屏遮罩 (Sniper Scope Overlay) -->
-    <div id="sniper-scope-overlay" class="sniper-scope-overlay hidden">
-      <div class="scope-vignette"></div>
-      <div class="scope-lens">
-        <div class="scope-cross-h"></div>
-        <div class="scope-cross-v"></div>
-        <div class="scope-circle-inner"></div>
-        <div class="scope-circle-outer"></div>
-        <div class="scope-range-lines"></div>
-        <div class="scope-telemetry top-left">ZOOM: 2.0X OPTICAL</div>
-        <div class="scope-telemetry top-right">PIERCING: ENGAGED</div>
-        <div class="scope-telemetry bottom-left">RADAR: ACTIVE</div>
-        <div id="scope-target-text" class="scope-telemetry bottom-right">TARGET: ACQUIRING</div>
-      </div>
     </div>
 
     <!-- 友军误伤警报全屏泛光层 -->

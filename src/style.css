@@ -81,13 +81,13 @@ body {
   display: block;
 }
 
-/* 第3层: 顶层 HUD 交互层 */
+/* 第3层: 顶层 HUD 交互层 (包含摇杆、切枪、探身、准星与按键，始终位于最上层) */
 #hud {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100dvh;
-  z-index: 3;
+  z-index: 10;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -1288,18 +1288,18 @@ body {
   color: #facc15;
 }
 
-/* 狙击枪全屏瞄准镜遮罩 */
+/* 狙击枪全屏瞄准镜遮罩 (位于 3D 画布 z-index:2 之上、但在 HUD z-index:10 之下，保证全套操控完全可见) */
 .sniper-scope-overlay {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100dvh;
-  z-index: 4;
+  z-index: 3;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, transparent 32vmin, rgba(3, 7, 18, 0.96) 42vmin, #000 100%);
+  background: radial-gradient(circle at center, transparent 32vmin, rgba(3, 8, 20, 0.7) 42vmin, rgba(2, 6, 14, 0.85) 100%);
   transition: opacity 0.2s ease;
 }
 
