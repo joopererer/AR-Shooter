@@ -144,6 +144,36 @@ body {
   gap: 4px;
 }
 
+.mode-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.hud-mode-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 243, 255, 0.12);
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  border-radius: 12px;
+  padding: 2px 8px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hud-mode-pill:active {
+  transform: scale(0.92);
+  background: rgba(0, 243, 255, 0.25);
+}
+
 .badge {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -447,6 +477,77 @@ body {
 /* ==========================================================================
    HUD 底部控制栏
    ========================================================================== */
+
+/* ==========================================================================
+   左下角战术虚拟移动摇杆 (Virtual Joystick)
+   ========================================================================== */
+
+#joystick-zone {
+  position: absolute;
+  left: 20px;
+  bottom: 95px;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 15;
+  touch-action: none;
+}
+
+.joystick-base {
+  position: relative;
+  width: 106px;
+  height: 106px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 243, 255, 0.05) 0%, rgba(10, 20, 36, 0.6) 70%);
+  border: 1.5px solid rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 16px rgba(0, 243, 255, 0.15), inset 0 0 12px rgba(0, 243, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.joystick-ring {
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed rgba(0, 243, 255, 0.35);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spin-cw 30s linear infinite;
+}
+
+.joystick-stick {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #00f3ff, #0077b6);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 14px rgba(0, 243, 255, 0.6), 0 4px 10px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(0px, 0px);
+  transition: box-shadow 0.15s ease, transform 0.05s linear;
+  pointer-events: none;
+}
+
+.joystick-stick.active {
+  box-shadow: 0 0 22px rgba(0, 243, 255, 0.9), 0 0 35px rgba(0, 243, 255, 0.4);
+  transform: scale(1.08);
+}
+
+.stick-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff;
+}
 
 #bottom-bar {
   display: flex;

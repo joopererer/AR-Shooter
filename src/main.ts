@@ -1,7 +1,7 @@
 /**
  * AR 空间射手 - 主游戏控制器 (main.ts)
  * 整合 Three.js 渲染管线、WebRTC 相机层、陀螺仪四元数控制、怪物管理、
- * 屏幕边缘指示雷达、屏幕中心射线射击与 Web Audio 音效系统。
+ * 屏幕边缘指示雷达、虚拟战术移动摇杆 (6DoF 近大远小走动)、WebXR 原生空间行走与 Web Audio 音效系统。
  */
 
 import * as THREE from 'three';
@@ -9,6 +9,10 @@ import { CameraManager } from './camera';
 import { GyroController, SensorMode } from './gyro';
 import { MonsterManager, MonsterEntity } from './monster';
 import { IndicatorManager } from './indicator';
+import { VirtualJoystick } from './joystick';
+import { WebXRManager } from './webxr';
+
+export type LocomotionMode = 'joystick' | 'webxr' | 'stationary';
 
 class ArShooterGame {
   // 3D 渲染核心
@@ -24,6 +28,11 @@ class ArShooterGame {
   private gyroController: GyroController;
   private monsterManager: MonsterManager;
   private indicatorManager: IndicatorManager;
+  private virtualJoystick: VirtualJoystick;
+  private webxrManager: WebXRManager;
+
+  // 空间位移与控制模式
+  private locomotionMode: LocomotionMode = 'joystick';
 
   // 游戏数值与状态
   private score: number = 0;
@@ -41,6 +50,9 @@ class ArShooterGame {
   private targetsValEl: HTMLElement;
   private statusBadgeEl: HTMLElement;
   private sensorModeEl: HTMLElement;
+  private modeSwitchBtnEl: HTMLElement;
+  private modePillIconEl: HTMLElement;
+  private modePillTextEl: HTMLElement;
   private crosshairEl: HTMLElement;
   private hitFeedbackContainer: HTMLElement;
   private startModalEl: HTMLElement;
@@ -57,6 +69,9 @@ class ArShooterGame {
     this.targetsValEl = document.getElementById('targets-val')!;
     this.statusBadgeEl = document.getElementById('status-badge')!;
     this.sensorModeEl = document.getElementById('sensor-mode')!;
+    this.modeSwitchBtnEl = document.getElementById('mode-switch-btn')!;
+    this.modePillIconEl = document.getElementById('mode-pill-icon')!;
+    this.modePillTextEl = document.getElementById('mode-pill-text')!;
     this.crosshairEl = document.getElementById('crosshair')!;
     this.hitFeedbackContainer = document.getElementById('hit-feedback-container')!;
     this.startModalEl = document.getElementById('start-modal')!;
@@ -70,7 +85,7 @@ class ArShooterGame {
     // 2. 初始化 Three.js 场景
     this.scene = new THREE.Scene();
 
-    // 3. 初始化透视相机 (视场角 70 度，适配大多数手机后置镜头垂直广角)
+    // 3. 初始化透视相机
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(70, aspect, 0.1, 1000);
     this.camera.position.set(0, 0, 0);
@@ -79,11 +94,11 @@ class ArShooterGame {
     const canvas = document.getElementById('ar-canvas') as HTMLCanvasElement;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      alpha: true, // 核心配置：背景透明以透显视频流
+      alpha: true,
       antialias: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setClearColor(0x000000, 0); // 完全透明
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -100,14 +115,42 @@ class ArShooterGame {
     });
     this.monsterManager = new MonsterManager(this.scene, 6);
     this.indicatorManager = new IndicatorManager('indicator-container');
+    this.virtualJoystick = new VirtualJoystick('joystick-zone');
+
+    // 初始化 WebXR 管理器
+    this.webxrManager = new WebXRManager(this.renderer, {
+      onSessionStarted: () => {
+        this.locomotionMode = 'webxr';
+        this.updateModeUI();
+        this.showStatusNotification('已开启 WebXR 真实空间行走');
+        // 隐藏常规视频背景（WebXR 自带原生相机图层穿透）
+        const video = document.getElementById('camera-bg');
+        if (video) video.style.opacity = '0';
+      },
+      onSessionEnded: () => {
+        this.locomotionMode = 'joystick';
+        this.updateModeUI();
+        this.showStatusNotification('已返回摇杆推进模式');
+        const video = document.getElementById('camera-bg');
+        if (video) video.style.opacity = '1';
+      },
+      onError: (err) => {
+        this.showStatusNotification(`WebXR 异常: ${err.message}`);
+        this.locomotionMode = 'joystick';
+        this.updateModeUI();
+      },
+    });
+
+    // 默认开启摇杆可见
+    this.virtualJoystick.setVisible(true);
 
     // 8. 绑定事件并检查安全上下文
     this.bindEvents();
     this.checkSecurityContext();
 
-    // 9. 启动渲染循环
+    // 9. 启动渲染循环 (Three.js WebXR 推荐使用 setAnimationLoop 兼容普通与 XR 帧)
     this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
+    this.renderer.setAnimationLoop(this.animate);
   }
 
   /**
@@ -149,10 +192,9 @@ class ArShooterGame {
    * 绑定所有交互事件
    */
   private bindEvents(): void {
-    // 窗口尺寸变更
     window.addEventListener('resize', () => this.handleResize(), false);
 
-    // 启动游戏按钮：必须在用户点击事件直接调用 iOS 权限与摄像头
+    // 启动游戏按钮
     this.startBtnEl.addEventListener('click', () => this.handleGameStart());
 
     // 开火按钮
@@ -161,19 +203,33 @@ class ArShooterGame {
       this.triggerFire();
     });
 
-    // 屏幕触摸/点击也可快速开火 (除特定按钮区域外)
+    // 屏幕触摸/点击也可快速开火 (避开摇杆区与按钮区)
     window.addEventListener('pointerdown', (e) => {
       if (!this.isGameRunning) return;
       const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('#top-bar')) return;
+      if (
+        target.closest('button') ||
+        target.closest('#top-bar') ||
+        target.closest('#joystick-zone')
+      ) {
+        return;
+      }
       this.triggerFire();
     });
 
-    // 重新定格校准按钮
+    // 模式切换按钮 (摇杆推进 / WebXR 物理行走 / 定点 3DoF)
+    this.modeSwitchBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.cycleLocomotionMode();
+    });
+
+    // 重新定格校准按钮 (视角重置正前，位置重置回原点)
     this.recalibrateBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
       this.gyroController.recalibrate();
-      this.showStatusNotification('场景已重新定格对齐');
+      // 位置重置回原点 (0, 0, 0)
+      this.camera.position.set(0, 0, 0);
+      this.showStatusNotification('视角与站位已重置');
       this.playCalibrateSound();
     });
 
@@ -185,25 +241,75 @@ class ArShooterGame {
   }
 
   /**
+   * 循环切换位移控制模式
+   */
+  private async cycleLocomotionMode(): Promise<void> {
+    if (this.locomotionMode === 'joystick') {
+      // 尝试切换到 WebXR 6DoF 物理走动
+      const isXRSupported = await this.webxrManager.checkSupport();
+      if (isXRSupported) {
+        const hud = document.getElementById('hud') || undefined;
+        const success = await this.webxrManager.startSession(hud);
+        if (success) {
+          return;
+        }
+      }
+      // 不支持或启动失败则切换到经典定点 3DoF
+      this.showStatusNotification('当前设备未检测到 WebXR，转为定点 3DoF');
+      this.locomotionMode = 'stationary';
+      this.updateModeUI();
+    } else if (this.locomotionMode === 'webxr') {
+      // 退出 WebXR 会话，切换到定点 3DoF
+      await this.webxrManager.endSession();
+      this.locomotionMode = 'stationary';
+      this.updateModeUI();
+    } else {
+      // 切换到摇杆推进模式
+      this.locomotionMode = 'joystick';
+      this.updateModeUI();
+      this.showStatusNotification('已开启左手虚拟摇杆推进');
+    }
+  }
+
+  /**
+   * 更新模式 UI 显示
+   */
+  private updateModeUI(): void {
+    if (this.locomotionMode === 'joystick') {
+      this.modePillIconEl.textContent = '🕹️';
+      this.modePillTextEl.textContent = '摇杆推进';
+      this.virtualJoystick.setVisible(true);
+      this.sensorModeEl.textContent = '6DoF HYBRID';
+    } else if (this.locomotionMode === 'webxr') {
+      this.modePillIconEl.textContent = '🌐';
+      this.modePillTextEl.textContent = 'WebXR实景';
+      this.virtualJoystick.setVisible(false);
+      this.sensorModeEl.textContent = '6DoF SLAM';
+    } else {
+      this.modePillIconEl.textContent = '🎯';
+      this.modePillTextEl.textContent = '定点3DoF';
+      this.virtualJoystick.setVisible(false);
+      this.sensorModeEl.textContent = '3DoF GYRO';
+    }
+  }
+
+  /**
    * 用户点击开始游戏流程
    */
   private async handleGameStart(): Promise<void> {
     this.initAudioContext();
 
-    // 同步触发权限申请 (关键：iOS 13+ 需要在用户手势链中直接调用)
-    const gyroAllowed = await this.gyroController.requestPermission();
-    console.log('[ArShooterGame] 陀螺仪授权状态:', gyroAllowed);
-
-    // 同步请求后置摄像头视频流
-    const cameraResult = await this.cameraManager.initCamera();
-    console.log('[ArShooterGame] 摄像头初始化结果:', cameraResult);
+    // 申请陀螺仪与摄像头权限
+    await this.gyroController.requestPermission();
+    await this.cameraManager.initCamera();
 
     // 生成怪物群
     this.monsterManager.initMonsters();
     this.updateTargetCountUI();
 
-    // 首次定格校准：将当前朝向设为 (0, 0, -1)
+    // 首次定格校准
     this.gyroController.recalibrate();
+    this.camera.position.set(0, 0, 0);
 
     // 隐藏启动弹窗
     this.startModalEl.classList.add('fade-out');
@@ -212,19 +318,19 @@ class ArShooterGame {
     }, 400);
 
     this.isGameRunning = true;
+    this.updateModeUI();
     this.playCalibrateSound();
   }
 
-  /**
-   * 传感器模式切换提示
-   */
   private handleSensorModeChange(mode: SensorMode): void {
+    if (this.locomotionMode === 'webxr') return;
+
     if (mode === 'gyro') {
-      this.sensorModeEl.textContent = 'GYRO 3DoF';
+      this.sensorModeEl.textContent = this.locomotionMode === 'joystick' ? '6DoF HYBRID' : '3DoF GYRO';
       this.sensorModeEl.style.color = '#00f3ff';
       this.statusBadgeEl.textContent = 'AR SENSORS OK';
     } else {
-      this.sensorModeEl.textContent = 'MOUSE / TOUCH';
+      this.sensorModeEl.textContent = 'TOUCH / MOUSE';
       this.sensorModeEl.style.color = '#ffaa00';
       this.statusBadgeEl.textContent = 'MANUAL MODE';
     }
@@ -236,7 +342,6 @@ class ArShooterGame {
   private triggerFire(): void {
     if (!this.isGameRunning) return;
 
-    // 播放开火音效与触感震动
     this.playShootSound();
     if (navigator.vibrate) {
       navigator.vibrate([25, 20, 35]);
@@ -249,19 +354,15 @@ class ArShooterGame {
     let endPoint: THREE.Vector3;
 
     if (hitTarget) {
-      // 命中怪物
       const hitRes = this.monsterManager.hitMonster(hitTarget);
       endPoint = hitRes.worldPoint || hitTarget.currentPosition;
 
-      // 击中反馈动画
       this.handleHitFeedback(hitTarget, hitRes.killed || false);
       this.playHitSound();
     } else {
-      // 未命中，激光射向射线远方
       endPoint = this.camera.position.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(20));
     }
 
-    // 生成瞬态激光束动画
     this.createLaserBeam(this.camera.position, endPoint);
   }
 
@@ -273,7 +374,7 @@ class ArShooterGame {
     this.score += pts;
     this.scoreValEl.textContent = this.score.toString();
 
-    // 屏幕中央漂浮跳字 (按怪物类型定制高亮色)
+    // 屏幕中央漂浮跳字
     const floatText = document.createElement('div');
     floatText.className = 'hit-float-text';
     floatText.textContent = `+${pts} PTS`;
@@ -290,13 +391,11 @@ class ArShooterGame {
       floatText.remove();
     }, 800);
 
-    // 全屏轻微闪白光晕
     const flash = document.createElement('div');
     flash.className = 'screen-flash-hit';
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 250);
 
-    // 更新存活计数
     this.updateTargetCountUI();
   }
 
@@ -304,13 +403,11 @@ class ArShooterGame {
    * 创建科幻激光束
    */
   private createLaserBeam(start: THREE.Vector3, end: THREE.Vector3): void {
-    // 从相机略偏下方发出（模拟武器手持位置）
     const origin = start.clone().add(new THREE.Vector3(0, -0.2, 0).applyQuaternion(this.camera.quaternion));
     const dir = new THREE.Vector3().subVectors(end, origin);
     const len = dir.length();
 
     const geom = new THREE.CylinderGeometry(0.04, 0.04, len, 8);
-    // 旋转圆柱体使其对准方向
     geom.translate(0, len / 2, 0);
     geom.rotateX(Math.PI / 2);
 
@@ -333,9 +430,6 @@ class ArShooterGame {
     });
   }
 
-  /**
-   * 激光束随时间缩短淡出
-   */
   private updateLasers(delta: number): void {
     for (let i = this.activeLasers.length - 1; i >= 0; i--) {
       const item = this.activeLasers[i];
@@ -377,9 +471,6 @@ class ArShooterGame {
     }
   }
 
-  /**
-   * 状态栏简短飘字通知
-   */
   private showStatusNotification(msg: string): void {
     const originalText = this.statusBadgeEl.textContent;
     this.statusBadgeEl.textContent = msg;
@@ -387,19 +478,13 @@ class ArShooterGame {
     setTimeout(() => {
       this.statusBadgeEl.textContent = originalText;
       this.statusBadgeEl.style.color = '#00ffaa';
-    }, 1500);
+    }, 1800);
   }
 
-  /**
-   * 更新存活怪物数量 UI
-   */
   private updateTargetCountUI(): void {
     this.targetsValEl.textContent = this.monsterManager.getAliveCount().toString();
   }
 
-  /**
-   * 窗口尺寸自适应
-   */
   private handleResize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -411,9 +496,6 @@ class ArShooterGame {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 
-  /**
-   * Web Audio API 音效合成引擎 (零网络依赖，原生产生)
-   */
   private initAudioContext(): void {
     if (!this.audioCtx) {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -435,9 +517,6 @@ class ArShooterGame {
     }
   }
 
-  /**
-   * 激光发射音效 (快速滑降频调频振荡)
-   */
   private playShootSound(): void {
     if (!this.isSoundEnabled || !this.audioCtx) return;
     try {
@@ -459,14 +538,9 @@ class ArShooterGame {
 
       osc.start(now);
       osc.stop(now + 0.16);
-    } catch {
-      // 忽略音频异常
-    }
+    } catch {}
   }
 
-  /**
-   * 怪物击中/爆炸音效
-   */
   private playHitSound(): void {
     if (!this.isSoundEnabled || !this.audioCtx) return;
     try {
@@ -488,14 +562,9 @@ class ArShooterGame {
 
       osc.start(now);
       osc.stop(now + 0.36);
-    } catch {
-      // 忽略音频异常
-    }
+    } catch {}
   }
 
-  /**
-   * 锁定目标时的轻微蜂鸣音
-   */
   private playLockBeepSound(): void {
     if (!this.isSoundEnabled || !this.audioCtx) return;
     try {
@@ -515,14 +584,9 @@ class ArShooterGame {
 
       osc.start(now);
       osc.stop(now + 0.09);
-    } catch {
-      // 忽略音频异常
-    }
+    } catch {}
   }
 
-  /**
-   * 校准对齐提示音
-   */
   private playCalibrateSound(): void {
     if (!this.isSoundEnabled || !this.audioCtx) return;
     try {
@@ -545,38 +609,41 @@ class ArShooterGame {
         osc.start(start);
         osc.stop(start + 0.13);
       });
-    } catch {
-      // 忽略音频异常
-    }
+    } catch {}
   }
 
   /**
    * 游戏每一帧渲染主循环
    */
   private animate(): void {
-    requestAnimationFrame(this.animate);
-
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const elapsed = this.clock.getElapsedTime();
 
-    // 1. 更新陀螺仪姿态数据 (带 delta 阻尼平滑)
-    this.gyroController.update(delta);
+    // 1. 如果不在 WebXR 模式下，更新自定义陀螺仪四元数
+    if (!this.webxrManager.getIsActive()) {
+      this.gyroController.update(delta);
+    }
 
-    // 2. 更新怪物动画与 FOV 衰减
+    // 2. 摇杆模式下，处理空间位移推进 (前后左右走动靠近/远离怪物)
+    if (this.locomotionMode === 'joystick' && this.isGameRunning) {
+      this.virtualJoystick.applyMovement(this.camera, delta, 3.6);
+    }
+
+    // 3. 更新怪物动画、FOV 点积衰减与爆炸粒子
     this.monsterManager.update(delta, elapsed, this.camera);
 
-    // 3. 更新激光束
+    // 4. 更新激光束
     this.updateLasers(delta);
 
-    // 4. 实时检测准星是否锁定怪物
+    // 5. 准星锁定目标检测
     this.updateCrosshairLocking();
 
-    // 5. 更新屏外边缘指示箭头
+    // 6. 屏外边缘指示箭头更新 (距离与方位角随相机位移自适应)
     if (this.isGameRunning) {
       this.indicatorManager.update(this.camera, this.monsterManager.getActiveMonsters());
     }
 
-    // 6. 执行透明 WebGL 渲染
+    // 7. 执行渲染
     this.renderer.render(this.scene, this.camera);
   }
 }

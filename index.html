@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0e17" />
-    <title>AR 空间射手 - Web 3DoF AR Shooter</title>
+    <title>AR 空间射手 - Web 3DoF/6DoF AR Shooter</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -36,10 +36,18 @@
           <span class="label">SCORE</span>
           <span id="score-val" class="value">0</span>
         </div>
+
         <div class="hud-center-status">
           <span id="status-badge" class="badge">RADAR ACTIVE</span>
-          <span id="sensor-mode" class="mode-tag">GYRO</span>
+          <div class="mode-tags-row">
+            <span id="sensor-mode" class="mode-tag">GYRO</span>
+            <button id="mode-switch-btn" class="hud-mode-pill" title="切换空间位移控制模式">
+              <span id="mode-pill-icon">🕹️</span>
+              <span id="mode-pill-text">摇杆推进</span>
+            </button>
+          </div>
         </div>
+
         <div class="hud-card targets-card">
           <span class="label">ENEMIES</span>
           <span id="targets-val" class="value">0</span>
@@ -69,6 +77,16 @@
 
       <!-- 浮动伤害/击杀得分提示容器 -->
       <div id="hit-feedback-container"></div>
+
+      <!-- 左下角战术虚拟移动摇杆 (用于 6DoF 空间位移走动推进) -->
+      <div id="joystick-zone">
+        <div class="joystick-base">
+          <div class="joystick-ring"></div>
+          <div class="joystick-stick">
+            <div class="stick-core"></div>
+          </div>
+        </div>
+      </div>
 
       <!-- 底部控制栏 -->
       <footer id="bottom-bar">
@@ -114,7 +132,7 @@
             <span class="logo-ar">AR</span>
             <span class="logo-sub">VOID STRIKER</span>
           </div>
-          <p class="modal-subtitle">Web 跨平台 3DoF 空间现实射击</p>
+          <p class="modal-subtitle">Web 跨平台 3DoF/6DoF 空间现实射击</p>
         </div>
 
         <div class="feature-tags">
@@ -122,7 +140,7 @@
             <span class="tag-dot"></span> 陀螺仪实景追踪
           </div>
           <div class="tag-item">
-            <span class="tag-dot"></span> 后置 AR 视频融合
+            <span class="tag-dot"></span> 6DoF 自由走位推进
           </div>
           <div class="tag-item">
             <span class="tag-dot"></span> 屏外 3D 边缘雷达
@@ -130,8 +148,8 @@
         </div>
 
         <div class="instructions-box">
-          <p>🎯 <strong>移动端玩法</strong>：平举手机环顾四周，转动身体寻找漂浮在空间中的能量体异兽，中心准星锁定后点击 <strong>FIRE</strong> 射击。</p>
-          <p>💻 <strong>PC 调试模式</strong>：若无陀螺仪，将自动启用鼠标按住拖拽以环顾 360° 空间视场。</p>
+          <p>🎯 <strong>瞄准与射击</strong>：转动手机瞄准空间中的怪物，准星锁定变红后点击 <strong>FIRE</strong> 开火。</p>
+          <p>🕹️ <strong>走动靠近怪物 (近大远小)</strong>：左手拇指推左下角<strong>虚拟摇杆</strong>（或PC键盘 WASD）可自由前后走动靠近/远离怪物！顶部支持一键切换 WebXR 真实物理空间行走。</p>
         </div>
 
         <div id="permission-error-hint" class="error-hint hidden"></div>
