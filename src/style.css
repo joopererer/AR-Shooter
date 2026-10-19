@@ -1,0 +1,787 @@
+/* ==========================================================================
+   AR 空间射手 - 全屏沉浸式 HUD 样式表
+   ========================================================================== */
+
+:root {
+  --primary-cyan: #00f3ff;
+  --primary-cyan-glow: rgba(0, 243, 255, 0.4);
+  --danger-red: #ff3366;
+  --danger-red-glow: rgba(255, 51, 102, 0.6);
+  --warning-amber: #ffaa00;
+  --hud-bg-glass: rgba(10, 16, 26, 0.65);
+  --hud-border-glass: rgba(0, 243, 255, 0.25);
+  --hud-text: #e2f1f8;
+  --font-mono: "SF Mono", "Consolas", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  background-color: #050811;
+  color: var(--hud-text);
+  font-family: var(--font-sans);
+}
+
+/* ==========================================================================
+   视图分层系统 (3层全屏叠加)
+   ========================================================================== */
+
+/* 第1层: 真实相机背景视频流 */
+#camera-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  object-fit: cover;
+  z-index: 1;
+  transform: scaleX(1); /* 后置摄像头不镜像 */
+  background: transparent;
+}
+
+/* 备用虚拟环境网格（PC端/摄像头未就绪时的科幻空间网格背景） */
+#virtual-grid-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 0;
+  background: radial-gradient(circle at center, #0f1c30 0%, #050811 100%);
+  background-image: 
+    linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* 第2层: Three.js 3D 渲染透明画布 */
+#ar-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+}
+
+/* 第3层: 顶层 HUD 交互层 */
+#hud {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 3;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 16px);
+}
+
+/* ==========================================================================
+   HUD 顶部栏
+   ========================================================================== */
+
+#top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  pointer-events: auto;
+}
+
+.hud-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--hud-bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--hud-border-glass);
+  border-radius: 8px;
+  padding: 6px 14px;
+  min-width: 78px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.08);
+}
+
+.hud-card .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+}
+
+.hud-card .value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary-cyan);
+  text-shadow: 0 0 10px var(--primary-cyan-glow);
+}
+
+.hud-center-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #00ffaa;
+  background: rgba(0, 255, 170, 0.12);
+  border: 1px solid rgba(0, 255, 170, 0.4);
+  border-radius: 12px;
+  padding: 3px 10px;
+  text-shadow: 0 0 6px rgba(0, 255, 170, 0.5);
+  animation: pulse-glow 2.5s infinite ease-in-out;
+}
+
+.mode-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+/* ==========================================================================
+   屏幕正中心准星 (Crosshair)
+   ========================================================================== */
+
+#crosshair-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90px;
+  height: 90px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+#crosshair {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  transition: transform 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+/* 十字线 */
+.cross-line {
+  position: absolute;
+  background-color: var(--primary-cyan);
+  box-shadow: 0 0 6px var(--primary-cyan);
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.cross-top {
+  top: -8px;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 14px;
+}
+
+.cross-bottom {
+  bottom: -8px;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 14px;
+}
+
+.cross-left {
+  left: -8px;
+  top: calc(50% - 1px);
+  width: 14px;
+  height: 2px;
+}
+
+.cross-right {
+  right: -8px;
+  top: calc(50% - 1px);
+  width: 14px;
+  height: 2px;
+}
+
+/* 同心环 */
+.cross-circle-outer {
+  position: absolute;
+  inset: 6px;
+  border: 1.5px dashed var(--primary-cyan);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: spin-cw 20s linear infinite;
+  box-shadow: 0 0 8px var(--primary-cyan-glow);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cross-circle-inner {
+  position: absolute;
+  inset: 16px;
+  border: 1px solid rgba(0, 243, 255, 0.5);
+  border-radius: 50%;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.cross-center-dot {
+  position: absolute;
+  top: calc(50% - 2.5px);
+  left: calc(50% - 2.5px);
+  width: 5px;
+  height: 5px;
+  background-color: var(--primary-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--primary-cyan);
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+/* 锁定四角角标 */
+.cross-lock-bracket {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--primary-cyan);
+  opacity: 0.3;
+  transition: all 0.2s ease;
+}
+
+.bracket-tl { top: 0; left: 0; border-top: 2px solid; border-left: 2px solid; }
+.bracket-tr { top: 0; right: 0; border-top: 2px solid; border-right: 2px solid; }
+.bracket-bl { bottom: 0; left: 0; border-bottom: 2px solid; border-left: 2px solid; }
+.bracket-br { bottom: 0; right: 0; border-bottom: 2px solid; border-right: 2px solid; }
+
+.lock-hint {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--danger-red);
+  text-shadow: 0 0 8px var(--danger-red-glow);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+@keyframes spin-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 准星锁定目标时的样式 (变红并轻微放大) */
+#crosshair.locked {
+  transform: scale(1.18);
+}
+
+#crosshair.locked .cross-line {
+  background-color: var(--danger-red);
+  box-shadow: 0 0 10px var(--danger-red);
+}
+
+#crosshair.locked .cross-circle-outer {
+  border-color: var(--danger-red);
+  border-style: solid;
+  box-shadow: 0 0 12px var(--danger-red-glow);
+  animation-duration: 4s;
+}
+
+#crosshair.locked .cross-circle-inner {
+  border-color: var(--danger-red);
+  transform: scale(0.85);
+}
+
+#crosshair.locked .cross-center-dot {
+  background-color: var(--danger-red);
+  box-shadow: 0 0 10px var(--danger-red);
+  transform: scale(1.4);
+}
+
+#crosshair.locked .cross-lock-bracket {
+  opacity: 1;
+  border-color: var(--danger-red);
+  transform: scale(0.9);
+}
+
+#crosshair.locked .lock-hint {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   屏外怪物屏幕边缘指示箭头 (Indicator Layer)
+   ========================================================================== */
+
+#indicator-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.edge-indicator {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.1s ease-out;
+  filter: drop-shadow(0 0 6px rgba(255, 51, 102, 0.8));
+}
+
+.indicator-arrow-svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--danger-red);
+  transform-origin: center center;
+  animation: pulse-arrow 1s infinite alternate ease-in-out;
+}
+
+.indicator-distance {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  padding: 1px 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes pulse-arrow {
+  0% { transform: scale(0.9); opacity: 0.85; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+/* ==========================================================================
+   击中反馈与飘字 (Hit Feedback)
+   ========================================================================== */
+
+#hit-feedback-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.hit-float-text {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 8px var(--primary-cyan), 0 0 16px var(--primary-cyan-glow);
+  transform: translate(-50%, -50%);
+  animation: float-fade-up 0.8s forwards ease-out;
+  pointer-events: none;
+}
+
+@keyframes float-fade-up {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  30% {
+    transform: translate(-50%, -70%) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+
+/* 屏幕受击/击杀全屏闪烁 */
+.screen-flash-hit {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle, rgba(0, 243, 255, 0.25) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 8;
+  animation: hit-flash-anim 0.25s forwards ease-out;
+}
+
+@keyframes hit-flash-anim {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ==========================================================================
+   HUD 底部控制栏
+   ========================================================================== */
+
+#bottom-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 12px 16px 20px 16px;
+  pointer-events: auto;
+  gap: 16px;
+}
+
+.hud-btn {
+  background: var(--hud-bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--hud-border-glass);
+  color: var(--hud-text);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hud-btn:active {
+  transform: scale(0.92);
+}
+
+.secondary-btn {
+  width: 72px;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.secondary-btn .btn-icon {
+  width: 20px;
+  height: 20px;
+  stroke: var(--primary-cyan);
+}
+
+/* 大号核心 FIRE 开火按钮 */
+.fire-btn {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff4b72, #c7153a);
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    0 0 24px var(--danger-red-glow),
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    inset 0 2px 6px rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font-weight: 900;
+  margin-top: -16px;
+}
+
+.fire-btn-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.fire-btn .fire-icon {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.fire-btn .fire-text {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.fire-btn-pulse {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--danger-red);
+  border-radius: 50%;
+  animation: fire-pulse 1.8s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes fire-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+.fire-btn:active {
+  transform: scale(0.9);
+  background: radial-gradient(circle at 35% 35%, #ff2050, #960c28);
+  box-shadow: 0 0 35px var(--danger-red-glow);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================================================
+   启动遮罩弹窗 (Start Modal)
+   ========================================================================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(3, 6, 12, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.modal-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.modal-card {
+  position: relative;
+  background: linear-gradient(145deg, rgba(16, 26, 44, 0.95), rgba(8, 14, 24, 0.95));
+  border: 1px solid var(--hud-border-glass);
+  border-radius: 20px;
+  padding: 30px 24px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 243, 255, 0.15);
+  overflow: hidden;
+}
+
+.modal-glow {
+  position: absolute;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 100px;
+  background: radial-gradient(circle, var(--primary-cyan-glow), transparent 70%);
+  pointer-events: none;
+}
+
+.modal-header {
+  margin-bottom: 20px;
+}
+
+.game-logo {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.logo-ar {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--primary-cyan);
+  text-shadow: 0 0 16px var(--primary-cyan-glow);
+  background: linear-gradient(to right, #00f3ff, #00a8ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+.modal-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 4px;
+}
+
+.feature-tags {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: rgba(0, 243, 255, 0.08);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 12px;
+  padding: 4px 10px;
+  color: #b0e5ff;
+}
+
+.tag-dot {
+  width: 5px;
+  height: 5px;
+  background-color: var(--primary-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--primary-cyan);
+}
+
+.instructions-box {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 20px;
+}
+
+.instructions-box p + p {
+  margin-top: 8px;
+}
+
+.error-hint {
+  font-size: 12px;
+  color: #ff5577;
+  background: rgba(255, 51, 102, 0.15);
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.start-btn {
+  position: relative;
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #00f3ff, #0088ff);
+  border: none;
+  color: #030a16;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 243, 255, 0.35);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.start-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 4px 12px rgba(0, 243, 255, 0.5);
+}
+
+.btn-glow-bar {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-25deg);
+  animation: shine-sweep 3s infinite ease-in-out;
+}
+
+@keyframes shine-sweep {
+  0% { left: -100%; }
+  40%, 100% { left: 180%; }
+}
+
+.btn-arrow {
+  width: 18px;
+  height: 18px;
+  stroke: #030a16;
+  transition: transform 0.2s ease;
+}
+
+.start-btn:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+.permission-notice {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 14px;
+}
+
+/* ==========================================================================
+   移动端与横屏适配
+   ========================================================================== */
+
+@media (orientation: landscape) and (max-height: 500px) {
+  #top-bar {
+    padding: 4px 20px;
+  }
+  .hud-card {
+    padding: 3px 10px;
+  }
+  .hud-card .value {
+    font-size: 18px;
+  }
+  #bottom-bar {
+    padding: 6px 20px 10px 20px;
+  }
+  .fire-btn {
+    width: 76px;
+    height: 76px;
+    margin-top: -10px;
+  }
+  .secondary-btn {
+    height: 46px;
+    width: 64px;
+  }
+  .modal-card {
+    padding: 16px 20px;
+  }
+}

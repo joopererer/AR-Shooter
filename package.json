@@ -1,0 +1,25 @@
+{
+  "name": "ar-shooter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "bugs": {
+    "url": "https://github.com/joopererer/AR-Shooter/issues"
+  },
+  "homepage": "https://github.com/joopererer/AR-Shooter#readme",
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

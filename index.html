@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0a0e17" />
+    <title>AR 空间射手 - Web 3DoF AR Shooter</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- 第1层 (底层 z-index: 1): 真实相机背景视频流 -->
+    <video
+      id="camera-bg"
+      autoplay
+      playsinline
+      muted
+      webkit-playsinline
+    ></video>
+
+    <!-- 备用虚拟环境背景（无摄像头或桌面端降级时显现的科幻网格天球） -->
+    <div id="virtual-grid-bg"></div>
+
+    <!-- 第2层 (中层 z-index: 2): Three.js 透明渲染画布 -->
+    <canvas id="ar-canvas"></canvas>
+
+    <!-- 第3层 (顶层 z-index: 3): HUD 2D 交互层 -->
+    <div id="hud">
+      <!-- 顶部信息栏 -->
+      <header id="top-bar">
+        <div class="hud-card score-card">
+          <span class="label">SCORE</span>
+          <span id="score-val" class="value">0</span>
+        </div>
+        <div class="hud-center-status">
+          <span id="status-badge" class="badge">RADAR ACTIVE</span>
+          <span id="sensor-mode" class="mode-tag">GYRO</span>
+        </div>
+        <div class="hud-card targets-card">
+          <span class="label">ENEMIES</span>
+          <span id="targets-val" class="value">0</span>
+        </div>
+      </header>
+
+      <!-- 屏外怪物边缘指示器挂载容器 -->
+      <div id="indicator-container"></div>
+
+      <!-- 屏幕正中央准星 Crosshair -->
+      <div id="crosshair-wrapper">
+        <div id="crosshair">
+          <div class="cross-line cross-top"></div>
+          <div class="cross-line cross-bottom"></div>
+          <div class="cross-line cross-left"></div>
+          <div class="cross-line cross-right"></div>
+          <div class="cross-circle-outer"></div>
+          <div class="cross-circle-inner"></div>
+          <div class="cross-center-dot"></div>
+          <div class="cross-lock-bracket bracket-tl"></div>
+          <div class="cross-lock-bracket bracket-tr"></div>
+          <div class="cross-lock-bracket bracket-bl"></div>
+          <div class="cross-lock-bracket bracket-br"></div>
+          <span id="lock-hint" class="lock-hint">LOCKED</span>
+        </div>
+      </div>
+
+      <!-- 浮动伤害/击杀得分提示容器 -->
+      <div id="hit-feedback-container"></div>
+
+      <!-- 底部控制栏 -->
+      <footer id="bottom-bar">
+        <button id="recalibrate-btn" class="hud-btn secondary-btn" title="重新对齐当前视角为正前方">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+          <span>定格校准</span>
+        </button>
+
+        <button id="fire-btn" class="hud-btn fire-btn">
+          <div class="fire-btn-inner">
+            <div class="fire-btn-pulse"></div>
+            <svg class="fire-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+            </svg>
+            <span class="fire-text">FIRE</span>
+          </div>
+        </button>
+
+        <button id="sound-btn" class="hud-btn secondary-btn" title="开关音效">
+          <svg id="sound-icon-on" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="sound-icon-off" class="btn-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+          <span id="sound-text">音效</span>
+        </button>
+      </footer>
+    </div>
+
+    <!-- 启动遮罩弹窗 (用于同步触发 iOS 陀螺仪与摄像头权限) -->
+    <div id="start-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-glow"></div>
+        <div class="modal-header">
+          <div class="game-logo">
+            <span class="logo-ar">AR</span>
+            <span class="logo-sub">VOID STRIKER</span>
+          </div>
+          <p class="modal-subtitle">Web 跨平台 3DoF 空间现实射击</p>
+        </div>
+
+        <div class="feature-tags">
+          <div class="tag-item">
+            <span class="tag-dot"></span> 陀螺仪实景追踪
+          </div>
+          <div class="tag-item">
+            <span class="tag-dot"></span> 后置 AR 视频融合
+          </div>
+          <div class="tag-item">
+            <span class="tag-dot"></span> 屏外 3D 边缘雷达
+          </div>
+        </div>
+
+        <div class="instructions-box">
+          <p>🎯 <strong>移动端玩法</strong>：平举手机环顾四周，转动身体寻找漂浮在空间中的能量体异兽，中心准星锁定后点击 <strong>FIRE</strong> 射击。</p>
+          <p>💻 <strong>PC 调试模式</strong>：若无陀螺仪，将自动启用鼠标按住拖拽以环顾 360° 空间视场。</p>
+        </div>
+
+        <div id="permission-error-hint" class="error-hint hidden"></div>
+
+        <button id="start-btn" class="start-btn">
+          <span class="btn-glow-bar"></span>
+          <span class="btn-text">开启 AR 射击作战</span>
+          <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+
+        <p class="permission-notice">点击按钮将请求 iOS/Android 摄像头与设备方向感应授权</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
