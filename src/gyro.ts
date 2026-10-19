@@ -338,6 +338,16 @@ export class GyroController {
   }
 
   /**
+   * 获取设备横滚倾斜角 (用于体感歪头探身 Roll-to-Peek)
+   */
+  public getRollAngle(): number {
+    if (this.deviceOrientation && typeof this.deviceOrientation.gamma === 'number') {
+      return this.deviceOrientation.gamma;
+    }
+    return 0;
+  }
+
+  /**
    * 销毁并解绑所有事件监听
    */
   public dispose(): void {

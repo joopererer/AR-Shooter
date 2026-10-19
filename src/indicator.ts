@@ -6,7 +6,12 @@
  */
 
 import * as THREE from 'three';
-import { MonsterEntity } from './monster';
+
+export interface IndicatorTarget {
+  id: string;
+  isDying: boolean;
+  currentPosition: THREE.Vector3;
+}
 
 export class IndicatorManager {
   private container: HTMLElement;
@@ -29,7 +34,7 @@ export class IndicatorManager {
   /**
    * 每一帧更新所有屏外怪物的边缘指示箭头
    */
-  public update(camera: THREE.Camera, monsters: MonsterEntity[]): void {
+  public update(camera: THREE.Camera, monsters: IndicatorTarget[]): void {
     // 1. 更新相机视锥 Frustum
     this.projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projScreenMatrix);

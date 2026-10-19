@@ -40,16 +40,20 @@
         <div class="hud-center-status">
           <span id="status-badge" class="badge">RADAR ACTIVE</span>
           <div class="mode-tags-row">
-            <span id="sensor-mode" class="mode-tag">GYRO</span>
+            <button id="game-mode-btn" class="hud-mode-pill mode-highlight" title="点击切换玩法模式 (荒野狩猎 / 星际防卫 / 幽灵猎手)">
+              <span id="game-mode-icon">🌲</span>
+              <span id="game-mode-text">荒野狩猎</span>
+            </button>
             <button id="mode-switch-btn" class="hud-mode-pill" title="切换空间位移控制模式">
               <span id="mode-pill-icon">🕹️</span>
               <span id="mode-pill-text">摇杆推进</span>
             </button>
+            <span id="sensor-mode" class="mode-tag">GYRO</span>
           </div>
         </div>
 
         <div class="hud-card targets-card">
-          <span class="label">ENEMIES</span>
+          <span class="label">TARGETS</span>
           <span id="targets-val" class="value">0</span>
         </div>
       </header>
@@ -57,7 +61,7 @@
       <!-- 屏外怪物边缘指示器挂载容器 -->
       <div id="indicator-container"></div>
 
-      <!-- 屏幕正中央准星 Crosshair -->
+      <!-- 屏幕正中央智能准星 Crosshair -->
       <div id="crosshair-wrapper">
         <div id="crosshair">
           <div class="cross-line cross-top"></div>
@@ -72,11 +76,50 @@
           <div class="cross-lock-bracket bracket-bl"></div>
           <div class="cross-lock-bracket bracket-br"></div>
           <span id="lock-hint" class="lock-hint">LOCKED</span>
+          <span id="friendly-warning-badge" class="reticle-badge friendly-badge hidden">⚠️ 友军禁射</span>
+          <span id="cover-blocked-badge" class="reticle-badge blocked-badge hidden">🛡️ 掩体遮挡</span>
         </div>
       </div>
 
-      <!-- 浮动伤害/击杀得分提示容器 -->
+      <!-- 浮动伤害/击杀得分与误伤提示容器 -->
       <div id="hit-feedback-container"></div>
+
+      <!-- 中间操作交互区 (左右两侧) -->
+      <div id="hud-mid-row">
+        <!-- 左侧：歪头探身控制器 (Peek Control) -->
+        <div id="peek-controller">
+          <div class="peek-header">
+            <span class="peek-title">◀ 闪身探头 ▶</span>
+            <span id="peek-val-text" class="peek-val">0.0m</span>
+          </div>
+          <div class="peek-btn-group">
+            <button id="peek-left-btn" class="peek-btn" title="向左大幅探身">◀ 左探</button>
+            <button id="peek-center-btn" class="peek-btn" title="机位居中回正">回正</button>
+            <button id="peek-right-btn" class="peek-btn" title="向右大幅探身">右探 ▶</button>
+          </div>
+          <input id="peek-slider" type="range" min="-2.2" max="2.2" step="0.1" value="0" title="左右滑动机位探身绕过掩体" />
+        </div>
+
+        <!-- 右侧：武器选择基座 (Weapon Dock) -->
+        <div id="weapon-dock">
+          <button class="weapon-btn active" data-weapon="rifle" title="猎鹿步枪 (点射精准无散布)">
+            <span class="weapon-icon">🔫</span>
+            <span class="weapon-name">步枪</span>
+          </button>
+          <button class="weapon-btn" data-weapon="shotgun" title="双管霰弹 (8发大范围近战轰鸣)">
+            <span class="weapon-icon">💥</span>
+            <span class="weapon-name">霰弹</span>
+          </button>
+          <button class="weapon-btn" data-weapon="sniper" title="光学穿甲狙 (2X放大视野+无视掩体穿透)">
+            <span class="weapon-icon">🔭</span>
+            <span class="weapon-name">穿甲狙</span>
+          </button>
+          <div class="shake-hint" title="手机大幅度摇晃或上挑可体感切枪">
+            <span class="shake-icon">⚡</span>
+            <span>甩动切枪</span>
+          </div>
+        </div>
+      </div>
 
       <!-- 左下角战术虚拟移动摇杆 (用于 6DoF 空间位移走动推进) -->
       <div id="joystick-zone">
@@ -122,6 +165,25 @@
         </button>
       </footer>
     </div>
+
+    <!-- 狙击枪 2X 光学瞄准镜全屏遮罩 (Sniper Scope Overlay) -->
+    <div id="sniper-scope-overlay" class="sniper-scope-overlay hidden">
+      <div class="scope-vignette"></div>
+      <div class="scope-lens">
+        <div class="scope-cross-h"></div>
+        <div class="scope-cross-v"></div>
+        <div class="scope-circle-inner"></div>
+        <div class="scope-circle-outer"></div>
+        <div class="scope-range-lines"></div>
+        <div class="scope-telemetry top-left">ZOOM: 2.0X OPTICAL</div>
+        <div class="scope-telemetry top-right">PIERCING: ENGAGED</div>
+        <div class="scope-telemetry bottom-left">RADAR: ACTIVE</div>
+        <div id="scope-target-text" class="scope-telemetry bottom-right">TARGET: ACQUIRING</div>
+      </div>
+    </div>
+
+    <!-- 友军误伤警报全屏泛光层 -->
+    <div id="friendly-flash-overlay" class="friendly-flash-overlay hidden"></div>
 
     <!-- 启动遮罩弹窗 (用于同步触发 iOS 陀螺仪与摄像头权限) -->
     <div id="start-modal" class="modal-overlay">
