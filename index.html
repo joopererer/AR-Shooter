@@ -58,6 +58,10 @@
             <span id="game-mode-icon">🌲</span>
             <span id="game-mode-text">荒野狩猎</span>
           </button>
+          <button id="fullscreen-btn" class="hud-mode-pill fullscreen-pill" title="全屏沉浸显示 (隐藏浏览器地址栏)">
+            <span id="fullscreen-icon">⛶</span>
+            <span id="fullscreen-text">全屏</span>
+          </button>
         </div>
 
         <div class="top-bar-center" id="top-center-telemetry">
@@ -100,6 +104,14 @@
         </div>
       </header>
 
+      <!-- 幽灵猎手 护栏受击四向红光警示 (上=正面, 下=背后, 左=左侧, 右=右侧) -->
+      <div id="directional-damage-indicator" class="directional-damage-indicator">
+        <div id="dmg-glow-top" class="dir-glow glow-top"></div>
+        <div id="dmg-glow-bottom" class="dir-glow glow-bottom"></div>
+        <div id="dmg-glow-left" class="dir-glow glow-left"></div>
+        <div id="dmg-glow-right" class="dir-glow glow-right"></div>
+      </div>
+
       <!-- 屏外怪物边缘指示器挂载容器 (360度模式独占) -->
       <div id="indicator-container"></div>
 
@@ -123,6 +135,12 @@
         </div>
       </div>
 
+      <!-- 星际防卫 敌机等离子锁定来袭警报条 -->
+      <div id="incoming-plasma-warning" class="incoming-warning hidden">
+        <span class="warning-blink-icon">⚠️</span>
+        <span class="warning-text">等离子锁定来袭！立即滚转闪避！</span>
+      </div>
+
       <!-- 浮动伤害/击杀得分与误伤提示容器 -->
       <div id="hit-feedback-container"></div>
 
@@ -143,6 +161,31 @@
             <button id="peek-right-btn" class="peek-btn" title="向右大幅探身">右探 ▶</button>
           </div>
           <input id="peek-slider" type="range" min="-2.2" max="2.2" step="0.1" value="0" title="左右滑动机位探身绕过掩体" />
+        </div>
+
+        <!-- 中央/下侧：星际防卫 专属全息战术雷达仪 (实时显示飞船、敌机与弹道轨迹) -->
+        <div id="scifi-tactical-radar" class="scifi-radar-hud hidden">
+          <div class="radar-header">
+            <span class="radar-title">TACTICAL RADAR</span>
+            <span id="radar-alert-tag" class="radar-status">NORMAL</span>
+          </div>
+          <div class="radar-display">
+            <div class="radar-grid">
+              <div class="radar-ring ring-1"></div>
+              <div class="radar-ring ring-2"></div>
+              <div class="radar-axis-h"></div>
+              <div class="radar-axis-v"></div>
+              <div class="radar-fov-cone"></div>
+            </div>
+            <!-- 玩家飞船三角标，随左右闪避实时位移 -->
+            <div id="radar-player-ship" class="radar-ship-icon">▲</div>
+            <!-- 动态光点容器 (敌机◆与子弹●) -->
+            <div id="radar-blips-container" class="radar-blips-container"></div>
+          </div>
+          <div class="radar-footer">
+            <span class="radar-dist">RANGE 30M</span>
+            <span id="radar-evade-hint" class="radar-hint">点击闪避避开弹道</span>
+          </div>
         </div>
 
         <!-- 右侧：武器选择基座 (Weapon Dock) -->
@@ -255,7 +298,10 @@
             <h2 class="hub-title">AR 射击游戏中心</h2>
             <p class="hub-subtitle">全景空间沙盒 · 复古光枪街机 · 陀螺仪实景交互</p>
           </div>
-          <button id="hub-close-btn" class="hub-close-btn" title="关闭大厅继续游戏">✕</button>
+          <div class="hub-header-actions">
+            <button id="hub-fullscreen-btn" class="hub-fullscreen-btn" title="全屏沉浸游戏 (隐藏地址栏)">⛶ 全屏模式</button>
+            <button id="hub-close-btn" class="hub-close-btn" title="关闭大厅继续游戏">✕</button>
+          </div>
         </div>
 
         <div class="hub-scroll-body">

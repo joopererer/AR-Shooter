@@ -547,6 +547,311 @@ body {
 }
 
 /* ==========================================================================
+   幽灵猎手 护栏受击四向红光警示 (Directional Damage Indicator)
+   ========================================================================== */
+.directional-damage-indicator {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  overflow: hidden;
+}
+
+.dir-glow {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.glow-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%);
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.65);
+}
+
+.glow-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(0deg, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%);
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.65);
+}
+
+.glow-left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%);
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.65);
+}
+
+.glow-right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  background: linear-gradient(270deg, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%);
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.65);
+}
+
+.dir-glow.flash {
+  opacity: 1;
+  transition: opacity 0.04s ease-in;
+}
+
+/* ==========================================================================
+   星际防卫 来袭等离子锁定警报条 (Incoming Warning Banner)
+   ========================================================================== */
+.incoming-warning {
+  position: absolute;
+  top: 65px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(220, 38, 38, 0.88);
+  border: 1px solid #ff4444;
+  border-radius: 20px;
+  padding: 5px 14px;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.85);
+  animation: warning-pulse 0.4s infinite alternate ease-in-out;
+  z-index: 30;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@keyframes warning-pulse {
+  0% {
+    transform: translateX(-50%) scale(0.96);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+  100% {
+    transform: translateX(-50%) scale(1.04);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 1);
+  }
+}
+
+/* ==========================================================================
+   星际防卫 2D HUD 战术全息雷达仪 (Sci-Fi Tactical Radar)
+   ========================================================================== */
+.scifi-radar-hud {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 16px));
+  bottom: 235px;
+  width: 146px;
+  background: rgba(10, 15, 28, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(0, 243, 255, 0.08);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.scifi-radar-hud.alert-active {
+  border-color: #ef4444;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+}
+
+.radar-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.radar-title {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--primary-cyan);
+  font-weight: 800;
+}
+
+.radar-status {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.radar-status.alert {
+  color: #ef4444;
+  animation: radar-alert-blink 0.3s infinite alternate;
+}
+
+@keyframes radar-alert-blink {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.radar-display {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 243, 255, 0.08) 0%, rgba(10, 15, 28, 0.9) 75%);
+  border: 1px solid rgba(0, 243, 255, 0.45);
+  overflow: hidden;
+}
+
+.radar-grid {
+  position: absolute;
+  inset: 0;
+}
+
+.radar-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 243, 255, 0.25);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.radar-ring.ring-1 {
+  width: 32px;
+  height: 32px;
+}
+
+.radar-ring.ring-2 {
+  width: 62px;
+  height: 62px;
+}
+
+.radar-axis-h {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 243, 255, 0.2);
+}
+
+.radar-axis-v {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(0, 243, 255, 0.2);
+}
+
+.radar-fov-cone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: conic-gradient(from 330deg at 50% 50%, rgba(0, 243, 255, 0.12) 0deg, rgba(0, 243, 255, 0.12) 60deg, transparent 60deg, transparent 360deg);
+  pointer-events: none;
+}
+
+.radar-ship-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #00ffff;
+  font-size: 13px;
+  text-shadow: 0 0 6px #00ffff;
+  transition: transform 0.08s ease-out;
+}
+
+.radar-blips-container {
+  position: absolute;
+  inset: 0;
+}
+
+.blip-enemy {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: #ff3366;
+  border-radius: 1px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 4px #ff3366;
+}
+
+.blip-bullet {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ff0022;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 5px #ff0022;
+}
+
+.radar-footer {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.radar-hint {
+  color: var(--primary-cyan);
+}
+
+/* 全屏按钮与大厅动作 */
+.fullscreen-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.fullscreen-pill:hover,
+.fullscreen-pill:active {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: #00f3ff;
+}
+
+.hub-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hub-fullscreen-btn {
+  background: rgba(0, 243, 255, 0.12);
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  color: #00f3ff;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.hub-fullscreen-btn:active {
+  transform: scale(0.96);
+  background: rgba(0, 243, 255, 0.25);
+}
+
+/* ==========================================================================
    HUD 底部控制栏
    ========================================================================== */
 
@@ -2001,17 +2306,22 @@ body.duckhunt-active #fire-btn {
     padding: 2px 6px;
   }
 
-  /* 1. 闪身探头面板：左侧安全边距，底边高度严格对齐右侧换枪按钮 (bottom: 95px) */
+  /* 1. 闪身探头面板：左侧安全边距，上移至摇杆上方 (bottom: 140px)，彻底消除与摇杆重叠 */
   #peek-controller {
     position: absolute;
     left: max(16px, env(safe-area-inset-left, 16px));
-    bottom: 95px;
+    bottom: 140px;
     transform: none;
     width: 146px;
     padding: 6px 8px;
     gap: 4px;
     border-radius: 10px;
     z-index: 20;
+  }
+
+  .scifi-radar-hud {
+    bottom: 235px;
+    left: max(16px, env(safe-area-inset-left, 16px));
   }
 
   .peek-header {

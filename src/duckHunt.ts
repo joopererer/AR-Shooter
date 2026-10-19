@@ -168,20 +168,36 @@ export class DuckHuntEngine {
     }
   }
 
+  private stageGroup?: THREE.Group;
+
   /**
-   * 获取正前方舞台 Z 轴距离 (横屏模式自动拉近至 -5.8m，竖屏 -8.0m，兼顾开阔度与目标清晰度)
+   * 获取正前方舞台 Z 轴距离 (横屏模式深度拉近至 -3.8m 获得震撼视效，竖屏 -8.0m 保持开阔)
    */
   public getStageZ(): number {
     const isLandscape = window.innerWidth > window.innerHeight;
-    return isLandscape ? -5.8 : -8.0;
+    return isLandscape ? -3.8 : -8.0;
+  }
+
+  /**
+   * 屏幕方向或尺寸变化时重新对齐舞台与猎犬深度
+   */
+  public onResize(): void {
+    const stageZ = this.getStageZ();
+    if (this.stageGroup) {
+      this.stageGroup.position.z = stageZ;
+    }
+    if (this.dogState === 'hidden') {
+      this.dogGroup.position.z = stageZ - 0.05;
+    }
   }
 
   /**
    * 构建正前方绿色草丛遮挡与小树舞台 (Spawn Framing)
-   * 横屏 -5.8m / 竖屏 -8.0m，保证舒适直视，无需大角度旋转
+   * 横屏 -3.8m / 竖屏 -8.0m，保证舒适直视，无需大角度旋转
    */
   private buildForegroundStage(): void {
     const stageGroup = new THREE.Group();
+    this.stageGroup = stageGroup;
     const stageZ = this.getStageZ();
     stageGroup.position.set(0, -1.5, stageZ);
 
@@ -607,18 +623,20 @@ export class DuckHuntEngine {
         d.position.addScaledVector(d.velocity, delta);
         d.meshGroup.position.copy(d.position);
 
-        // 视界边界框反弹: X in [-5, 5], Y in [-0.5, 4.2], Z in [stageZ - 2.5, stageZ + 0.8]
-        if (d.position.x < -5.0 || d.position.x > 5.0) {
+        // 视界边界框反弹 (横屏拉近至 -3.8m，相应收窄横向边界保持在舒适视野内)
+        const isLandscape = window.innerWidth > window.innerHeight;
+        const boundX = isLandscape ? 3.8 : 5.0;
+        if (d.position.x < -boundX || d.position.x > boundX) {
           d.velocity.x = -d.velocity.x;
-          d.position.x = Math.max(-5.0, Math.min(5.0, d.position.x));
+          d.position.x = Math.max(-boundX, Math.min(boundX, d.position.x));
         }
-        if (d.position.y < -0.5 || d.position.y > 4.2) {
+        if (d.position.y < -0.4 || d.position.y > 3.6) {
           d.velocity.y = -d.velocity.y;
-          d.position.y = Math.max(-0.5, Math.min(4.2, d.position.y));
+          d.position.y = Math.max(-0.4, Math.min(3.6, d.position.y));
         }
         const stageZ = this.getStageZ();
-        const minZ = stageZ - 2.5;
-        const maxZ = stageZ + 0.8;
+        const minZ = stageZ - 1.8;
+        const maxZ = stageZ + 0.6;
         if (d.position.z < minZ || d.position.z > maxZ) {
           d.velocity.z = -d.velocity.z;
           d.position.z = Math.max(minZ, Math.min(maxZ, d.position.z));

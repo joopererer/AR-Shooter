@@ -88,6 +88,27 @@ class ArShooterGame {
   private fenceHealth: number = 100;
   private shieldHealth: number = 100;
 
+  // 全屏控制
+  private fullscreenBtnEl: HTMLElement | null;
+  private fullscreenIconEl: HTMLElement | null;
+  private fullscreenTextEl: HTMLElement | null;
+  private hubFullscreenBtnEl: HTMLElement | null;
+
+  // 幽灵猎手受击四向红光指示
+  private dmgGlowTopEl: HTMLElement | null;
+  private dmgGlowBottomEl: HTMLElement | null;
+  private dmgGlowLeftEl: HTMLElement | null;
+  private dmgGlowRightEl: HTMLElement | null;
+
+  // 星际战术雷达与来袭锁定预警
+  private scifiRadarHudEl: HTMLElement | null;
+  private radarPlayerShipEl: HTMLElement | null;
+  private radarBlipsContainerEl: HTMLElement | null;
+  private radarAlertTagEl: HTMLElement | null;
+  private incomingPlasmaWarningEl: HTMLElement | null;
+  private lastIncomingAlarmTime: number = 0;
+  private dodgedProjectiles = new Set<string>();
+
   private crosshairEl: HTMLElement;
   private lockHintEl: HTMLElement;
   private friendlyBadgeEl: HTMLElement;
@@ -212,6 +233,23 @@ class ArShooterGame {
     this.nesRetryBtnEl = document.getElementById('nes-retry-btn')!;
     this.nesHubReturnBtnEl = document.getElementById('nes-hub-return-btn')!;
 
+    // 全屏按钮与方向受击指示绑定
+    this.fullscreenBtnEl = document.getElementById('fullscreen-btn');
+    this.fullscreenIconEl = document.getElementById('fullscreen-icon');
+    this.fullscreenTextEl = document.getElementById('fullscreen-text');
+    this.hubFullscreenBtnEl = document.getElementById('hub-fullscreen-btn');
+    this.dmgGlowTopEl = document.getElementById('dmg-glow-top');
+    this.dmgGlowBottomEl = document.getElementById('dmg-glow-bottom');
+    this.dmgGlowLeftEl = document.getElementById('dmg-glow-left');
+    this.dmgGlowRightEl = document.getElementById('dmg-glow-right');
+
+    // 星际战术雷达与来袭锁定预警绑定
+    this.scifiRadarHudEl = document.getElementById('scifi-tactical-radar');
+    this.radarPlayerShipEl = document.getElementById('radar-player-ship');
+    this.radarBlipsContainerEl = document.getElementById('radar-blips-container');
+    this.radarAlertTagEl = document.getElementById('radar-alert-tag');
+    this.incomingPlasmaWarningEl = document.getElementById('incoming-plasma-warning');
+
     // 2. 初始化 Three.js 场景与玩家 Rig 控制容器
     this.scene = new THREE.Scene();
     this.scene.add(this.playerRig);
@@ -252,7 +290,7 @@ class ArShooterGame {
       this.scene,
       () => this.handlePlayerHitByEnemy(),
       () => this.audioManager.playEnemyLaserFire(),
-      (dmg) => this.handleFenceDamaged(dmg)
+      (dmg, pos) => this.handleFenceDamaged(dmg, pos)
     );
     this.weaponManager = new WeaponManager(this.camera, (cfg) => this.onWeaponSwitched(cfg));
     this.cockpitManager = new CockpitManager(this.camera);
@@ -439,10 +477,25 @@ class ArShooterGame {
       }
     });
 
-    // 歪头探身控制器 (Peek Buttons & Slider)
+    // 全屏沉浸模式切换 (隐藏移动浏览器地址栏与导航条)
+    const handleToggleFullscreen = (e: Event) => {
+      e.stopPropagation();
+      this.toggleFullscreen();
+    };
+    this.fullscreenBtnEl?.addEventListener('click', handleToggleFullscreen);
+    this.hubFullscreenBtnEl?.addEventListener('click', handleToggleFullscreen);
+
+    document.addEventListener('fullscreenchange', () => this.updateFullscreenUI());
+    document.addEventListener('webkitfullscreenchange', () => this.updateFullscreenUI());
+
+    // 歪头探身控制器 (Peek Buttons & Slider / 星际模式下为战术滚转侧闪)
     this.peekLeftBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.setPeekOffsetDirect(-1.8);
+      if (this.modeManager.getMode() === 'scifi') {
+        this.triggerTacticalDodge(-2.2);
+      } else {
+        this.setPeekOffsetDirect(-1.8);
+      }
     });
     this.peekCenterBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -450,7 +503,11 @@ class ArShooterGame {
     });
     this.peekRightBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.setPeekOffsetDirect(1.8);
+      if (this.modeManager.getMode() === 'scifi') {
+        this.triggerTacticalDodge(2.2);
+      } else {
+        this.setPeekOffsetDirect(1.8);
+      }
     });
     this.peekSliderEl.addEventListener('input', () => {
       this.sliderPeekOffset = parseFloat(this.peekSliderEl.value);
@@ -611,6 +668,14 @@ class ArShooterGame {
       this.generalStatusBoxEl?.classList.remove('hidden');
       this.fenceHpContainerEl?.classList.add('hidden');
       this.shieldHpContainerEl?.classList.add('hidden');
+      this.scifiRadarHudEl?.classList.add('hidden');
+      this.incomingPlasmaWarningEl?.classList.add('hidden');
+
+      const pTitle = document.querySelector('.peek-title');
+      if (pTitle) pTitle.textContent = '◀ 闪身探头 ▶';
+      this.peekLeftBtnEl.textContent = '◀ 左探';
+      this.peekCenterBtnEl.textContent = '回正';
+      this.peekRightBtnEl.textContent = '右探 ▶';
 
       this.virtualJoystick.setVisible(true);
       this.peekControllerEl.classList.remove('hidden');
@@ -623,6 +688,14 @@ class ArShooterGame {
       this.generalStatusBoxEl?.classList.add('hidden');
       this.fenceHpContainerEl?.classList.add('hidden');
       this.shieldHpContainerEl?.classList.remove('hidden');
+      this.scifiRadarHudEl?.classList.remove('hidden');
+
+      // 星际防卫模式将闪身控制升级为【战术滚转侧闪】
+      const pTitle = document.querySelector('.peek-title');
+      if (pTitle) pTitle.textContent = '◀ 战术滚转侧闪 ▶';
+      this.peekLeftBtnEl.textContent = '◀ 滚转左闪';
+      this.peekCenterBtnEl.textContent = '回中';
+      this.peekRightBtnEl.textContent = '滚转右闪 ▶';
 
       this.virtualJoystick.setVisible(true);
       this.peekControllerEl.classList.remove('hidden');
@@ -636,6 +709,8 @@ class ArShooterGame {
       this.generalStatusBoxEl?.classList.add('hidden');
       this.fenceHpContainerEl?.classList.remove('hidden');
       this.shieldHpContainerEl?.classList.add('hidden');
+      this.scifiRadarHudEl?.classList.add('hidden');
+      this.incomingPlasmaWarningEl?.classList.add('hidden');
 
       // 玩家被限制在圆形铁围栏内：不能前进，只能 360 度旋转射击
       this.virtualJoystick.setVisible(false);
@@ -847,7 +922,7 @@ class ArShooterGame {
     }
   }
 
-  private handleFenceDamaged(damage: number): void {
+  private handleFenceDamaged(damage: number, attackerPos?: THREE.Vector3): void {
     if (this.modeManager.getMode() !== 'ghost' || !this.isGameRunning) return;
     this.fenceHealth = Math.max(0, this.fenceHealth - damage);
     if (this.fenceHpFillEl) {
@@ -862,6 +937,21 @@ class ArShooterGame {
       this.fenceHpTextEl.textContent = `${this.fenceHealth}%`;
     }
 
+    // 计算攻击者相对于当前相机构成的四向方位 (上=正面, 下=背后, 左=左侧, 右=右侧)
+    if (attackerPos) {
+      const local = attackerPos.clone().applyMatrix4(this.camera.matrixWorldInverse);
+      const angle = Math.atan2(local.x, -local.z); // [-PI, PI]
+      if (Math.abs(angle) < Math.PI / 4) {
+        this.flashDirectionalDamage('top');
+      } else if (angle >= Math.PI / 4 && angle < (3 * Math.PI) / 4) {
+        this.flashDirectionalDamage('right');
+      } else if (Math.abs(angle) >= (3 * Math.PI) / 4) {
+        this.flashDirectionalDamage('bottom');
+      } else {
+        this.flashDirectionalDamage('left');
+      }
+    }
+
     this.environmentManager.flashFenceDamage();
     this.audioManager.playShipShieldHit();
     this.triggerFriendlyWarningFlash();
@@ -869,6 +959,155 @@ class ArShooterGame {
 
     if (this.fenceHealth <= 0) {
       this.handleGameOver('铁围栏已彻底破损，防线失守！');
+    }
+  }
+
+  /**
+   * 触发幽灵猎手护栏受击边缘红光警示
+   */
+  private flashDirectionalDamage(dir: 'top' | 'bottom' | 'left' | 'right'): void {
+    let el: HTMLElement | null = null;
+    if (dir === 'top') el = this.dmgGlowTopEl;
+    else if (dir === 'bottom') el = this.dmgGlowBottomEl;
+    else if (dir === 'left') el = this.dmgGlowLeftEl;
+    else if (dir === 'right') el = this.dmgGlowRightEl;
+
+    if (el) {
+      el.classList.remove('flash');
+      void el.offsetWidth;
+      el.classList.add('flash');
+      setTimeout(() => el?.classList.remove('flash'), 500);
+    }
+  }
+
+  /**
+   * 星际战机一键战术滚转侧闪推进
+   */
+  private triggerTacticalDodge(val: number): void {
+    this.setPeekOffsetDirect(val);
+    this.audioManager.playShipThrusterDodge();
+    this.showHitPopup(val < 0 ? '◀ 战术左滚转闪避！' : '战术右滚转闪避！ ▶', false, 'hit-score');
+  }
+
+  /**
+   * 网页全屏沉浸模式切换 (隐藏移动浏览器地址栏)
+   */
+  private toggleFullscreen(): void {
+    const doc = document as any;
+    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    if (!isFull) {
+      const el = document.documentElement as any;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
+    } else {
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen().catch(() => {});
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      }
+    }
+  }
+
+  private updateFullscreenUI(): void {
+    const doc = document as any;
+    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    if (this.fullscreenIconEl) {
+      this.fullscreenIconEl.textContent = isFull ? '🗗' : '⛶';
+    }
+    if (this.fullscreenTextEl) {
+      this.fullscreenTextEl.textContent = isFull ? '退出' : '全屏';
+    }
+    if (this.hubFullscreenBtnEl) {
+      this.hubFullscreenBtnEl.textContent = isFull ? '🗗 退出全屏' : '⛶ 全屏模式';
+    }
+  }
+
+  /**
+   * 刷新星际防卫 2D HUD 全息战术雷达与迎面等离子威胁预警
+   */
+  private updateSciFiTacticalRadar(
+    activeCam: THREE.Camera,
+    activeTargets: { position: THREE.Vector3; isDying: boolean }[],
+    projectiles: { position: THREE.Vector3; velocity: THREE.Vector3; life: number }[]
+  ): void {
+    if (!this.scifiRadarHudEl) return;
+
+    // 1. 战机小三角标位置随着闪避机动实时左右滑动
+    if (this.radarPlayerShipEl) {
+      const peek = this.environmentManager.getPeekOffset();
+      const px = (peek / 2.2) * 26; // [-26px, 26px]
+      this.radarPlayerShipEl.style.transform = `translate(-50%, -50%) translateX(${px.toFixed(1)}px)`;
+    }
+
+    // 2. 刷新雷达内光点 (敌机与等离子子弹)
+    if (this.radarBlipsContainerEl) {
+      let html = '';
+      const camMatrixInv = activeCam.matrixWorldInverse;
+
+      activeTargets.forEach((t) => {
+        if (t.isDying) return;
+        const local = t.position.clone().applyMatrix4(camMatrixInv);
+        const rx = 43 + (local.x / 28) * 38;
+        const ry = 43 + (local.z / 28) * 38;
+        if (rx >= 4 && rx <= 82 && ry >= 4 && ry <= 82) {
+          html += `<div class="blip-enemy" style="left:${rx.toFixed(1)}px; top:${ry.toFixed(1)}px;"></div>`;
+        }
+      });
+
+      let hasIncomingThreat = false;
+      const now = performance.now();
+
+      projectiles.forEach((p, idx) => {
+        const local = p.position.clone().applyMatrix4(camMatrixInv);
+        const rx = 43 + (local.x / 28) * 38;
+        const ry = 43 + (local.z / 28) * 38;
+        if (rx >= 4 && rx <= 82 && ry >= 4 && ry <= 82) {
+          html += `<div class="blip-bullet" style="left:${rx.toFixed(1)}px; top:${ry.toFixed(1)}px;"></div>`;
+        }
+
+        // 威胁判定：距离相机 < 14.0m 并且在玩家前方
+        const dist = p.position.distanceTo(activeCam.position);
+        if (dist < 14.0 && local.z < 0) {
+          hasIncomingThreat = true;
+
+          // 极限闪避 (Near Miss)：子弹在 0.65m ~ 1.9m 范围内擦肩飞过
+          if (dist > 0.65 && dist < 1.9) {
+            const projKey = `dodge_${idx}_${Math.floor(p.life * 2)}`;
+            if (!this.dodgedProjectiles.has(projKey)) {
+              this.dodgedProjectiles.add(projKey);
+              this.score += 100;
+              this.scoreValEl.textContent = this.score.toString();
+              this.showHitPopup('⚡ 极限闪避! +100', false, 'hit-score');
+            }
+          }
+        }
+      });
+
+      this.radarBlipsContainerEl.innerHTML = html;
+
+      // 来袭警报触发
+      if (hasIncomingThreat) {
+        this.incomingPlasmaWarningEl?.classList.remove('hidden');
+        this.scifiRadarHudEl.classList.add('alert-active');
+        if (this.radarAlertTagEl) {
+          this.radarAlertTagEl.textContent = 'DANGER';
+          this.radarAlertTagEl.classList.add('alert');
+        }
+        if (now - this.lastIncomingAlarmTime > 600) {
+          this.audioManager.playIncomingAlarm();
+          this.lastIncomingAlarmTime = now;
+        }
+      } else {
+        this.incomingPlasmaWarningEl?.classList.add('hidden');
+        this.scifiRadarHudEl.classList.remove('alert-active');
+        if (this.radarAlertTagEl) {
+          this.radarAlertTagEl.textContent = 'NORMAL';
+          this.radarAlertTagEl.classList.remove('alert');
+        }
+      }
     }
   }
 
@@ -1150,6 +1389,8 @@ class ArShooterGame {
 
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    this.duckHuntEngine.onResize?.();
   }
 
   /**
@@ -1186,6 +1427,15 @@ class ArShooterGame {
       this.entityManager.update(delta, activeCam);
       this.weaponManager.update(delta);
       this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector(), this.sliderPeekOffset);
+
+      // 星际防卫模式刷新全息战术雷达与来袭威胁监控
+      if (this.modeManager.getMode() === 'scifi') {
+        const projectiles = this.entityManager.getEnemyProjectiles();
+        const activeTargets = this.entityManager.getActiveTargets();
+        this.cockpitManager.updateRadar(this.environmentManager.getPeekOffset(), activeTargets, projectiles, activeCam);
+        this.updateSciFiTacticalRadar(activeCam, activeTargets, projectiles);
+      }
+
       this.updateLasers(delta);
       this.updateSmartReticle();
 

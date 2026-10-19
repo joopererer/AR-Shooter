@@ -218,6 +218,145 @@ export class CockpitManager {
       fireCover.position.set(jx, -0.15, 0.06);
       this.cockpitRig.add(fireCover);
     });
+
+    // 0. 机鼻流线装甲前锥 (Forward Chiseled Nose Cone)
+    const noseGeo = new THREE.ConeGeometry(0.13, 0.46, 4);
+    const noseMesh = new THREE.Mesh(noseGeo, frameMat);
+    noseMesh.rotation.x = -Math.PI / 2 + 0.14;
+    noseMesh.rotation.y = Math.PI / 4; // 菱形切面机甲
+    noseMesh.position.set(0, -0.32, -0.18);
+    this.cockpitRig.add(noseMesh);
+    this.frameMeshes.push(noseMesh);
+    noseMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(noseGeo), edgeMat));
+
+    // 左右前掠翼与战术航行灯 (Canard Swept Wings & Navigation Strobes)
+    [-0.52, 0.52].forEach((side) => {
+      const isRight = side > 0;
+      const wingGeo = new THREE.BoxGeometry(0.38, 0.024, 0.22);
+      const wingMesh = new THREE.Mesh(wingGeo, frameMat);
+      wingMesh.position.set(side, -0.28, -0.06);
+      wingMesh.rotation.y = isRight ? -0.24 : 0.24;
+      wingMesh.rotation.z = isRight ? -0.12 : 0.12;
+      this.cockpitRig.add(wingMesh);
+      this.frameMeshes.push(wingMesh);
+      wingMesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(wingGeo), edgeMat));
+
+      // 翼尖航行警示灯 (左舷红光，右舷绿光，经典星际航空标准)
+      const beaconMat = new THREE.MeshBasicMaterial({ color: isRight ? 0x10b981 : 0xef4444 });
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 6), beaconMat);
+      beacon.position.set(isRight ? 0.19 : -0.19, 0.015, -0.08);
+      wingMesh.add(beacon);
+    });
+
+    // 5. 中央全息战术雷达投影仪 (Central Holographic Tactical Radar Deck)
+    const radarGroup = new THREE.Group();
+    radarGroup.position.set(0, -0.15, 0.06);
+    radarGroup.rotation.x = -Math.PI / 7;
+    this.cockpitRig.add(radarGroup);
+
+    // 雷达圆形半透明全息底盘
+    const discGeo = new THREE.CircleGeometry(0.075, 24);
+    const discMat = new THREE.MeshBasicMaterial({
+      color: 0x00f3ff,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+    });
+    const discMesh = new THREE.Mesh(discGeo, discMat);
+    discMesh.rotation.x = -Math.PI / 2;
+    radarGroup.add(discMesh);
+
+    // 环形同心圆刻度圈 (10m, 20m, 30m)
+    [0.025, 0.05, 0.075].forEach((r) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(r - 0.0015, r, 24),
+        new THREE.MeshBasicMaterial({ color: 0x00f3ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      radarGroup.add(ring);
+    });
+
+    // 雷达扫描十字轴线
+    const axisMat = new THREE.LineBasicMaterial({ color: 0x00f3ff, transparent: true, opacity: 0.35 });
+    const crossGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.075, 0.001, 0),
+      new THREE.Vector3(0.075, 0.001, 0),
+      new THREE.Vector3(0, 0.001, -0.075),
+      new THREE.Vector3(0, 0.001, 0.075),
+    ]);
+    radarGroup.add(new THREE.LineSegments(crossGeo, axisMat));
+
+    // 战机在雷达上的全息三角指示标 (随着玩家侧闪左右灵动偏移)
+    const shipIconGeo = new THREE.ConeGeometry(0.012, 0.025, 3);
+    const shipIconMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    this.radarPlayerIcon = new THREE.Mesh(shipIconGeo, shipIconMat);
+    this.radarPlayerIcon.rotation.x = -Math.PI / 2;
+    this.radarPlayerIcon.position.set(0, 0.003, 0);
+    radarGroup.add(this.radarPlayerIcon);
+
+    // 雷达动态光点容器
+    this.radarBlipsGroup = new THREE.Group();
+    radarGroup.add(this.radarBlipsGroup);
+  }
+
+  // 雷达网格属性
+  private radarPlayerIcon?: THREE.Mesh;
+  private radarBlipsGroup?: THREE.Group;
+
+  /**
+   * 刷新全息战术雷达 (显示战机当前闪避横向机位、敌机光点及迎面等离子弹道)
+   */
+  public updateRadar(
+    peekOffset: number,
+    enemies: { position: THREE.Vector3; isDying: boolean }[],
+    projectiles: { position: THREE.Vector3 }[],
+    camera: THREE.Camera
+  ): void {
+    if (!this.isVisible || !this.radarPlayerIcon || !this.radarBlipsGroup) return;
+
+    // 战机在雷达上的位置随着探身/闪避偏移 (peekOffset in [-2.2, 2.2] 映射到 [-0.035, 0.035])
+    this.radarPlayerIcon.position.x = (peekOffset / 2.2) * 0.035;
+
+    // 清空上一帧雷达光点
+    while (this.radarBlipsGroup.children.length > 0) {
+      const child = this.radarBlipsGroup.children.pop()!;
+      if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+    }
+
+    const camMatrixInv = camera.matrixWorldInverse;
+
+    // 绘制敌机光点 (菱形方块，红色)
+    enemies.forEach((e) => {
+      if (e.isDying) return;
+      const local = e.position.clone().applyMatrix4(camMatrixInv);
+      const scale = 0.0022; // 30m -> ~0.066
+      const rx = local.x * scale;
+      const rz = -local.z * scale;
+      if (rx * rx + rz * rz < 0.075 * 0.075) {
+        const blip = new THREE.Mesh(
+          new THREE.BoxGeometry(0.007, 0.007, 0.007),
+          new THREE.MeshBasicMaterial({ color: 0xff3366 })
+        );
+        blip.position.set(rx, 0.004, -rz);
+        this.radarBlipsGroup!.add(blip);
+      }
+    });
+
+    // 绘制敌方等离子子弹光点 (亮红小球)
+    projectiles.forEach((p) => {
+      const local = p.position.clone().applyMatrix4(camMatrixInv);
+      const scale = 0.0022;
+      const rx = local.x * scale;
+      const rz = -local.z * scale;
+      if (rx * rx + rz * rz < 0.075 * 0.075) {
+        const blip = new THREE.Mesh(
+          new THREE.SphereGeometry(0.005, 6, 6),
+          new THREE.MeshBasicMaterial({ color: 0xff0022 })
+        );
+        blip.position.set(rx, 0.005, -rz);
+        this.radarBlipsGroup!.add(blip);
+      }
+    });
   }
 
   /**
@@ -227,17 +366,17 @@ export class CockpitManager {
     if (!this.isVisible) return;
     this.engineTime += delta;
 
-    // 1. 操控倾斜侧滚 (Banking on Turn)
+    // 1. 操控倾斜侧滚 (Banking on Turn & Roll Dodge)
     const joyX = joystickVector ? joystickVector.x : 0;
     const joyY = joystickVector ? joystickVector.y : 0;
 
-    // 左右转向或侧身闪避时，座舱向转弯侧倾斜产生真实 G 动力感
-    this.targetRoll = -joyX * 0.14 - (peekOffset * 0.08);
+    // 左右转向或战术滚转闪避时，座舱向转弯侧大幅侧倾 (增大倾角产生真实太空狗斗感)
+    this.targetRoll = -joyX * 0.16 - (peekOffset * 0.14);
     // 前进推力后仰，后退前倾
-    this.targetPitch = joyY * 0.07;
+    this.targetPitch = joyY * 0.08;
 
-    this.currentRoll += (this.targetRoll - this.currentRoll) * Math.min(1.0, delta * 8.5);
-    this.currentPitch += (this.targetPitch - this.currentPitch) * Math.min(1.0, delta * 8.5);
+    this.currentRoll += (this.targetRoll - this.currentRoll) * Math.min(1.0, delta * 9.5);
+    this.currentPitch += (this.targetPitch - this.currentPitch) * Math.min(1.0, delta * 9.5);
 
     this.cockpitRig.rotation.z = this.currentRoll;
     this.cockpitRig.rotation.x = this.currentPitch;
@@ -246,7 +385,7 @@ export class CockpitManager {
     if (!this.isShieldFlashing) {
       const hum = Math.sin(this.engineTime * 35.0) * 0.0008;
       this.cockpitRig.position.y = hum;
-      this.cockpitRig.position.x = Math.cos(this.engineTime * 28.0) * 0.0005 + (peekOffset * 0.04);
+      this.cockpitRig.position.x = Math.cos(this.engineTime * 28.0) * 0.0005 + (peekOffset * 0.05);
     }
   }
 }

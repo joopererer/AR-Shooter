@@ -375,6 +375,67 @@ export class AudioManager {
     } catch {}
   }
 
+  /**
+   * 战机瞬时姿态滚转/侧闪推进器喷射声 (高推力低频呼啸 + 等离子放电)
+   */
+  public playShipThrusterDodge(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 1. 低频涡轮瞬时推力
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.28);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.29);
+
+      // 2. 气体喷射高频白噪
+      const bufSize = Math.floor(this.ctx.sampleRate * 0.2);
+      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.35));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buf;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.28, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      noise.connect(noiseGain);
+      noiseGain.connect(this.ctx.destination);
+      noise.start(now);
+    } catch {}
+  }
+
+  /**
+   * 敌机等离子/导弹锁定来袭蜂鸣警报 (急促双音调 BEEP-BEEP)
+   */
+  public playIncomingAlarm(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      [0, 0.1].forEach((offset) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1760, now + offset);
+        gain.gain.setValueAtTime(0.22, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.06);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.07);
+      });
+    } catch {}
+  }
+
   // ==========================================================================
   // FC 经典打鸭子 (Duck Hunt 1984) 8-Bit 原生音效合成
   // ==========================================================================

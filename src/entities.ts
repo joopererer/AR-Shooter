@@ -100,8 +100,8 @@ export class EntityManager {
   private onPlayerHitCallback?: () => void;
   private onEnemyFireCallback?: () => void;
 
-  // 幽灵模式铁护栏受击破坏回调
-  private onFenceDamageCallback?: (damage: number) => void;
+  // 幽灵模式铁护栏受击破坏回调 (带攻击者三维空间位置，用于全向受击红光警示)
+  private onFenceDamageCallback?: (damage: number, attackerPos: THREE.Vector3) => void;
 
   // 临时辅助向量
   private readonly tempCamPos = new THREE.Vector3();
@@ -112,7 +112,7 @@ export class EntityManager {
     scene: THREE.Scene,
     onPlayerHit?: () => void,
     onEnemyFire?: () => void,
-    onFenceDamage?: (damage: number) => void
+    onFenceDamage?: (damage: number, attackerPos: THREE.Vector3) => void
   ) {
     this.scene = scene;
     this.scene.add(this.rootGroup);
@@ -122,7 +122,7 @@ export class EntityManager {
     this.onFenceDamageCallback = onFenceDamage;
   }
 
-  public setFenceDamageCallback(cb: (damage: number) => void): void {
+  public setFenceDamageCallback(cb: (damage: number, attackerPos: THREE.Vector3) => void): void {
     this.onFenceDamageCallback = cb;
   }
 
@@ -1073,7 +1073,7 @@ export class EntityManager {
           if (e.fenceAttackCountdown <= 0) {
             e.fenceAttackCountdown = 3.2; // 周期性攻击
             if (this.onFenceDamageCallback) {
-              this.onFenceDamageCallback(10); // 蝙蝠每次抓挠 -10 HP
+              this.onFenceDamageCallback(10, e.position); // 蝙蝠每次抓挠 -10 HP
             }
           }
         }
@@ -1129,7 +1129,7 @@ export class EntityManager {
         if (e.fenceAttackCountdown <= 0) {
           e.fenceAttackCountdown = 3.8; // 倒计时重置，继续猛砸
           if (this.onFenceDamageCallback) {
-            this.onFenceDamageCallback(15); // 僵尸重击 -15 HP
+            this.onFenceDamageCallback(15, e.position); // 僵尸重击 -15 HP
           }
         }
       }
@@ -1201,24 +1201,53 @@ export class EntityManager {
   // 敌机等离子子弹弹幕射击与规避机制
   // ==========================================================================
 
-  private fireEnemyPlasma(origin: THREE.Vector3): void {
-    const geo = new THREE.SphereGeometry(0.14, 8, 8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(origin);
+  public getEnemyProjectiles(): { position: THREE.Vector3; velocity: THREE.Vector3; life: number }[] {
+    return this.enemyProjectiles.map((p) => ({
+      position: p.position.clone(),
+      velocity: p.velocity.clone(),
+      life: p.life,
+    }));
+  }
 
-    // 朝向玩家当前相机位置发射
+  private fireEnemyPlasma(origin: THREE.Vector3): void {
+    const pGroup = new THREE.Group();
+
+    // 1. 炽热等离子能量球核
+    const coreGeo = new THREE.SphereGeometry(0.16, 10, 10);
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    pGroup.add(core);
+
+    // 2. 外部脉冲能量光晕
+    const haloGeo = new THREE.SphereGeometry(0.28, 8, 8);
+    const haloMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.5 });
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    pGroup.add(halo);
+
+    // 3. 拖尾高能等离子尾锥 (面向来路)
+    const tailGeo = new THREE.ConeGeometry(0.14, 0.75, 6);
+    const tailMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.65 });
+    const tail = new THREE.Mesh(tailGeo, tailMat);
+    tail.rotation.x = Math.PI / 2;
+    tail.position.z = 0.38;
+    pGroup.add(tail);
+
+    pGroup.position.copy(origin);
+
+    // 朝向玩家当前相机位置发射 (降低弹速至 4.8 m/s，留出充足从容的闪避反应窗口)
     const dir = new THREE.Vector3().subVectors(this.tempCamPos, origin).normalize();
-    const speed = 7.5; // 7.5 m/s 适度弹速，给玩家通过摇杆或探身躲避反应时间
+    const speed = 4.8;
     const velocity = dir.multiplyScalar(speed);
 
-    this.projectileGroup.add(mesh);
+    pGroup.lookAt(this.tempCamPos);
+
+    this.projectileGroup.add(pGroup);
     this.enemyProjectiles.push({
-      mesh,
-      position: mesh.position,
+      mesh: pGroup as unknown as THREE.Mesh,
+      position: pGroup.position,
       velocity,
-      life: 5.0,
-      maxLife: 5.0,
+      life: 5.5,
+      maxLife: 5.5,
     });
 
     if (this.onEnemyFireCallback) {
@@ -1234,25 +1263,37 @@ export class EntityManager {
       p.position.addScaledVector(p.velocity, delta);
       p.mesh.position.copy(p.position);
 
-      // 判断是否击中玩家座舱 (< 0.75m)
+      // 判断是否击中玩家座舱 (< 0.65m)
       const distToPlayer = p.position.distanceTo(this.tempCamPos);
-      if (distToPlayer < 0.75) {
+      if (distToPlayer < 0.65) {
         // 击中玩家！
         if (this.onPlayerHitCallback) {
           this.onPlayerHitCallback();
         }
         this.projectileGroup.remove(p.mesh);
-        p.mesh.geometry.dispose();
-        (p.mesh.material as THREE.Material).dispose();
+        p.mesh.traverse((c) => {
+          if ((c as THREE.Mesh).geometry) (c as THREE.Mesh).geometry.dispose();
+          if ((c as THREE.Mesh).material) {
+            const mat = (c as THREE.Mesh).material;
+            if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+            else mat.dispose();
+          }
+        });
         this.enemyProjectiles.splice(i, 1);
         continue;
       }
 
       // 超出寿命或飞远清理
-      if (p.life <= 0 || p.position.distanceTo(this.tempCamPos) > 40) {
+      if (p.life <= 0 || p.position.distanceTo(this.tempCamPos) > 45) {
         this.projectileGroup.remove(p.mesh);
-        p.mesh.geometry.dispose();
-        (p.mesh.material as THREE.Material).dispose();
+        p.mesh.traverse((c) => {
+          if ((c as THREE.Mesh).geometry) (c as THREE.Mesh).geometry.dispose();
+          if ((c as THREE.Mesh).material) {
+            const mat = (c as THREE.Mesh).material;
+            if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+            else mat.dispose();
+          }
+        });
         this.enemyProjectiles.splice(i, 1);
       }
     }
