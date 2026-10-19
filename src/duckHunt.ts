@@ -91,9 +91,15 @@ export class DuckHuntEngine {
   private dogEarRight?: THREE.Mesh;
   private dogPaws?: THREE.Group;
   private dogHead?: THREE.Mesh;
+  private dogNormalEyes?: THREE.Group;
+  private dogLaughEyes?: THREE.Group;
+  private dogMouthOpen?: THREE.Mesh;
+  private dogTongue?: THREE.Mesh;
+  private dogAlertMark?: THREE.Group;
   private caughtDucksGroup?: THREE.Group;
-  private dogTargetY: number = -2.2;
-  private dogCurrentY: number = -2.2;
+  private dogTargetY: number = -3.2;
+  private dogCurrentY: number = -3.2;
+  private dogIntroTimer: number = 0;
 
   // 飞盘碎片系统
   private debrisMeshes: { mesh: THREE.Mesh; vel: THREE.Vector3; life: number }[] = [];
@@ -240,6 +246,13 @@ export class DuckHuntEngine {
     this.isFlyAway = false;
     this.activeDucks = [];
     this.activeClays = [];
+
+    // 野鸭起飞飞行期间，猎犬必须完全隐藏在草丛下，严禁常驻露面
+    this.dogState = 'hidden';
+    this.dogGroup.visible = false;
+    this.dogCurrentY = -3.2;
+    this.dogTargetY = -3.2;
+    this.dogGroup.position.set(0, -3.2, this.getStageZ() - 0.05);
 
     // 标记当前波次目标为 active 闪烁态
     const targetStartIndex = this.waveIndex * this.targetsPerWave;
@@ -794,7 +807,8 @@ export class DuckHuntEngine {
   }
 
   // ==========================================================================
-  // 3D 猎犬 (Hound Dog) 交互模型与动画控制器
+  // ==========================================================================
+  // 3D 猎犬 (Hound Dog) 交互模型与动画控制器 (1:1 还原 1984 NES 原作)
   // ==========================================================================
 
   private buildDogModel(): void {
@@ -805,16 +819,21 @@ export class DuckHuntEngine {
       this.dogGroup.remove(this.dogGroup.children[0]);
     }
 
-    this.dogCurrentY = -2.2;
-    this.dogTargetY = -2.2;
+    // 默认彻底隐匿在草丛地平线下方 (Y = -3.2m)，非表演时段绝不暴露！
+    this.dogCurrentY = -3.2;
+    this.dogTargetY = -3.2;
     this.dogGroup.position.set(0, this.dogCurrentY, this.getStageZ() - 0.05);
+    this.dogGroup.visible = false;
+    this.dogState = 'hidden';
 
     const dogBrown = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.8, flatShading: true });
-    const earBrown = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 });
+    const earBrown = new THREE.MeshStandardMaterial({ color: 0x6c2409, roughness: 0.8 });
     const muzzleCream = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.7 });
     const collarRed = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 });
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 });
     const blackMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
+    const tonguePink = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+    const darkMouth = new THREE.MeshBasicMaterial({ color: 0x3f0b0b });
 
     // 1. 躯干
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.0, 0.65), dogBrown);
@@ -835,23 +854,60 @@ export class DuckHuntEngine {
     this.dogGroup.add(head);
     this.dogHead = head;
 
-    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.34, 0.38), muzzleCream);
-    muzzle.position.set(0, -0.12, 0.38);
+    // 奶油色大嘴吻部
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.32, 0.38), muzzleCream);
+    muzzle.position.set(0, -0.06, 0.38);
     head.add(muzzle);
 
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.18), blackMat);
-    nose.position.set(0, 0.08, 0.22);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.16), blackMat);
+    nose.position.set(0, 0.09, 0.21);
     muzzle.add(nose);
 
-    // 眯眼笑
-    [-0.18, 0.18].forEach((eyeX) => {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.04), blackMat);
-      eye.position.set(eyeX, 0.12, 0.34);
-      head.add(eye);
-    });
+    // 张嘴大笑底腔与粉红舌头
+    const mouthCavity = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.18, 0.28), darkMouth);
+    mouthCavity.position.set(0, -0.22, 0.32);
+    head.add(mouthCavity);
+    this.dogMouthOpen = mouthCavity;
 
-    // 3. 经典垂耳
-    const earGeo = new THREE.BoxGeometry(0.2, 0.75, 0.32);
+    const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.22), tonguePink);
+    tongue.position.set(0, -0.04, 0.08);
+    tongue.rotation.x = 0.25;
+    mouthCavity.add(tongue);
+    this.dogTongue = tongue;
+    mouthCavity.visible = false;
+
+    // 常态眼睛 (两颗黑亮大眼睛)
+    const normalEyes = new THREE.Group();
+    [-0.18, 0.18].forEach((eyeX) => {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.04), blackMat);
+      eye.position.set(eyeX, 0.14, 0.34);
+      const glint = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.02), whiteMat);
+      glint.position.set(eyeX < 0 ? -0.02 : 0.02, 0.03, 0.03);
+      eye.add(glint);
+      normalEyes.add(eye);
+    });
+    head.add(normalEyes);
+    this.dogNormalEyes = normalEyes;
+
+    // 经典魔性眯月牙笑眼 (^ ^)
+    const laughEyes = new THREE.Group();
+    [-0.18, 0.18].forEach((eyeX) => {
+      // 尖尖的嘲讽微笑折线 ^
+      const leftBar = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.035, 0.04), blackMat);
+      leftBar.rotation.z = Math.PI / 4;
+      leftBar.position.set(eyeX - 0.035, 0.15, 0.34);
+      const rightBar = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.035, 0.04), blackMat);
+      rightBar.rotation.z = -Math.PI / 4;
+      rightBar.position.set(eyeX + 0.035, 0.15, 0.34);
+      laughEyes.add(leftBar);
+      laughEyes.add(rightBar);
+    });
+    laughEyes.visible = false;
+    head.add(laughEyes);
+    this.dogLaughEyes = laughEyes;
+
+    // 3. 经典垂耳 (可随笑声高频扇动)
+    const earGeo = new THREE.BoxGeometry(0.2, 0.8, 0.32);
     const earL = new THREE.Mesh(earGeo, earBrown);
     earL.position.set(-0.46, 1.25, 0.1);
     this.dogGroup.add(earL);
@@ -862,11 +918,11 @@ export class DuckHuntEngine {
     this.dogGroup.add(earR);
     this.dogEarRight = earR;
 
-    // 4. 捂嘴爪子
+    // 4. 双爪捂嘴 (两只白爪子紧贴嘴吻正前方，极富嘲讽力)
     const pawsGroup = new THREE.Group();
-    pawsGroup.position.set(0, 1.18, 0.46);
-    [-0.16, 0.16].forEach((px) => {
-      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.22), whiteMat);
+    pawsGroup.position.set(0, 1.2, 0.46);
+    [-0.15, 0.15].forEach((px) => {
+      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.22), whiteMat);
       paw.position.set(px, 0, 0);
       paw.rotation.x = -0.3;
       pawsGroup.add(paw);
@@ -875,10 +931,24 @@ export class DuckHuntEngine {
       pad.position.set(0, -0.02, 0.11);
       paw.add(pad);
     });
+    pawsGroup.visible = false;
     this.dogGroup.add(pawsGroup);
     this.dogPaws = pawsGroup;
 
-    // 5. 举起战利品鸭子
+    // 5. 警觉叹号 (开局发现野鸭时头上蹦出的蓝色感叹号 !)
+    const alertGroup = new THREE.Group();
+    alertGroup.position.set(0, 2.15, 0.1);
+    const alertMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const markTop = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.32, 0.08), alertMat);
+    alertGroup.add(markTop);
+    const markDot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.08), alertMat);
+    markDot.position.y = -0.28;
+    alertGroup.add(markDot);
+    alertGroup.visible = false;
+    this.dogGroup.add(alertGroup);
+    this.dogAlertMark = alertGroup;
+
+    // 6. 举起战利品鸭子
     const caughtGroup = new THREE.Group();
     caughtGroup.position.set(0, 1.35, 0.35);
     caughtGroup.visible = false;
@@ -886,28 +956,59 @@ export class DuckHuntEngine {
     this.caughtDucksGroup = caughtGroup;
   }
 
+  /**
+   * 回合开局动画：猎犬闻嗅跑过草丛 -> 停下嗅嗅空气 -> 惊觉感叹号 -> 纵身跃入草丛藏身
+   */
   private triggerDogIntro(onDone: () => void): void {
     this.dogState = 'intro';
+    this.dogIntroTimer = 0;
     this.audioManager.playNesDogIntro();
 
-    this.dogGroup.position.set(-2.4, -1.45, this.getStageZ() - 0.05);
+    const stageZ = this.getStageZ();
+    this.dogGroup.visible = true;
+    this.dogGroup.position.set(-3.6, -1.45, stageZ - 0.05);
     this.dogCurrentY = -1.45;
     this.dogTargetY = -1.45;
-    if (this.dogPaws) this.dogPaws.visible = false;
-    if (this.caughtDucksGroup) this.caughtDucksGroup.visible = false;
 
-    setTimeout(onDone, 2400);
+    if (this.dogPaws) this.dogPaws.visible = false;
+    if (this.dogNormalEyes) this.dogNormalEyes.visible = true;
+    if (this.dogLaughEyes) this.dogLaughEyes.visible = false;
+    if (this.dogMouthOpen) this.dogMouthOpen.visible = false;
+    if (this.caughtDucksGroup) this.caughtDucksGroup.visible = false;
+    if (this.dogAlertMark) this.dogAlertMark.visible = false;
+
+    // 2.2 秒后落入草丛彻底隐藏，启动野鸭波次
+    setTimeout(() => {
+      this.dogState = 'hidden';
+      this.dogGroup.visible = false;
+      this.dogCurrentY = -3.2;
+      this.dogTargetY = -3.2;
+      this.dogGroup.position.set(0, -3.2, stageZ - 0.05);
+      onDone();
+    }, 2200);
   }
 
+  /**
+   * 击中命中：从草丛后方探身举起捕获的野鸭，自豪微笑
+   */
   private triggerDogCatch(caughtCount: number, onDone: () => void): void {
     if (this.submode === 'game_c') {
       onDone();
       return;
     }
     this.dogState = 'celebrating';
+    this.dogGroup.visible = true;
     this.dogGroup.position.x = 0;
-    this.dogTargetY = -0.55;
+    this.dogCurrentY = -3.2;
+    this.dogTargetY = -0.55; // 升出草丛，胸口与战利品清晰可见
+
+    // 切换为自豪常态笑脸，收起捂嘴爪子
+    if (this.dogNormalEyes) this.dogNormalEyes.visible = true;
+    if (this.dogLaughEyes) this.dogLaughEyes.visible = false;
+    if (this.dogMouthOpen) this.dogMouthOpen.visible = false;
     if (this.dogPaws) this.dogPaws.visible = false;
+    if (this.dogAlertMark) this.dogAlertMark.visible = false;
+
     if (this.caughtDucksGroup) {
       this.caughtDucksGroup.visible = true;
       while (this.caughtDucksGroup.children.length > 0) {
@@ -934,70 +1035,130 @@ export class DuckHuntEngine {
     this.audioManager.playNesDogCatch();
 
     setTimeout(() => {
-      this.dogTargetY = -2.2;
+      this.dogTargetY = -3.2; // 平滑降回草丛后
       setTimeout(() => {
         this.dogState = 'hidden';
+        this.dogGroup.visible = false;
         onDone();
-      }, 350);
+      }, 400);
     }, 1450);
   }
 
+  /**
+   * 未击中/逃脱：经典魔性双手捂嘴嘲笑 (眯弯月牙笑眼、张嘴吐舌、耸肩抖动、双耳拍击)
+   */
   private triggerDogLaugh(onDone: () => void): void {
     if (this.submode === 'game_c') {
       onDone();
       return;
     }
     this.dogState = 'laughing';
+    this.dogGroup.visible = true;
     this.dogGroup.position.x = 0;
-    this.dogTargetY = -0.55; // 升出草丛，头部、胸口和捂嘴双手清晰露面
+    this.dogCurrentY = -3.2;
+    this.dogTargetY = -0.55; // 升出草丛，胸口、笑脸和捂嘴双爪露面
+    this.dogGroup.position.y = this.dogCurrentY;
+
+    // 切换到眯眼笑 + 张嘴吐舌 + 双爪捂嘴
+    if (this.dogNormalEyes) this.dogNormalEyes.visible = false;
+    if (this.dogLaughEyes) this.dogLaughEyes.visible = true;
+    if (this.dogMouthOpen) this.dogMouthOpen.visible = true;
     if (this.dogPaws) this.dogPaws.visible = true;
     if (this.caughtDucksGroup) this.caughtDucksGroup.visible = false;
+    if (this.dogAlertMark) this.dogAlertMark.visible = false;
 
     this.audioManager.playNesDogLaugh();
 
+    // 嘲笑 1.6 秒后平滑缩回草丛下并完全隐藏
     setTimeout(() => {
-      this.dogTargetY = -2.2; // 嘲笑结束后平滑缩回草丛下
+      this.dogTargetY = -3.2;
       setTimeout(() => {
         this.dogState = 'hidden';
+        this.dogGroup.visible = false;
         onDone();
-      }, 350);
-    }, 1650);
+      }, 400);
+    }, 1600);
   }
 
   private updateDogAnimation(delta: number): void {
-    // 平滑升降插值
-    this.dogCurrentY += (this.dogTargetY - this.dogCurrentY) * Math.min(1.0, delta * 12.0);
-    this.dogGroup.position.y = this.dogCurrentY;
-
     const time = performance.now() * 0.001;
 
     if (this.dogState === 'intro') {
-      this.dogGroup.position.x += 1.3 * delta;
-      if (this.dogGroup.position.x > 0.0) {
-        this.dogTargetY = -2.2;
-      }
-    } else if (this.dogState === 'laughing') {
-      // 经典魔性双肩快速上下抖动 + 捂嘴颤动 + 大耳朵扑腾
-      const bounce = Math.sin(time * 24.0) * 0.06;
-      this.dogGroup.position.y = this.dogCurrentY + bounce;
+      this.dogIntroTimer += delta;
+      const t = this.dogIntroTimer;
 
+      if (t < 0.9) {
+        // 阶段 1: 从左边小跑进入，低头闻草丛
+        this.dogGroup.position.x = -3.6 + (t / 0.9) * 2.2; // -3.6 -> -1.4
+        if (this.dogHead) this.dogHead.rotation.x = 0.25; // 低头嗅嗅
+        this.dogCurrentY = -1.45 + Math.abs(Math.sin(t * 14.0)) * 0.08;
+        this.dogTargetY = this.dogCurrentY;
+      } else if (t < 1.35) {
+        // 阶段 2: 停下抬头嗅嗅空气，头顶弹出 ! 惊觉号
+        if (this.dogHead) this.dogHead.rotation.x = -0.15;
+        if (this.dogAlertMark) this.dogAlertMark.visible = true;
+        this.dogCurrentY = -1.45;
+        this.dogTargetY = -1.45;
+      } else {
+        // 阶段 3: 高高跳起越过草丛并一头扎入草丛下方 (-3.2)
+        if (this.dogAlertMark) this.dogAlertMark.visible = false;
+        const leapProgress = (t - 1.35) / 0.85; // 0 -> 1
+        // 抛物线高跳: 顶点高度可达 -0.6
+        const archY = -1.45 + Math.sin(leapProgress * Math.PI) * 0.95 - leapProgress * 1.8;
+        this.dogCurrentY = Math.min(-0.5, archY);
+        this.dogTargetY = -3.2;
+        this.dogGroup.position.x = -1.4 + leapProgress * 1.4; // 跃向草丛中央
+        if (this.dogHead) this.dogHead.rotation.x = 0.4;
+      }
+      this.dogGroup.position.y = this.dogCurrentY;
+      return;
+    }
+
+    if (this.dogState === 'laughing') {
+      // 平滑升降插值
+      this.dogCurrentY += (this.dogTargetY - this.dogCurrentY) * Math.min(1.0, delta * 12.0);
+
+      // 经典魔性耸肩耸头抖动 (8-9Hz 高频笑抽节律)
+      const laughTremble = Math.sin(time * 26.0) * 0.08;
+      this.dogGroup.position.y = this.dogCurrentY + laughTremble;
+
+      // 双垂耳疯狂扑腾
       if (this.dogEarLeft && this.dogEarRight) {
-        const earFlap = Math.sin(time * 24.0) * 0.25;
-        this.dogEarLeft.rotation.z = earFlap;
-        this.dogEarRight.rotation.z = -earFlap;
+        const earFlap = Math.sin(time * 26.0) * 0.35;
+        this.dogEarLeft.rotation.z = 0.15 + earFlap;
+        this.dogEarRight.rotation.z = -0.15 - earFlap;
       }
 
+      // 双爪捂在嘴前快速轻微左右摇摆颤动 (偷笑抽动)
       if (this.dogPaws) {
-        this.dogPaws.position.y = 1.18 + Math.sin(time * 24.0) * 0.03;
+        this.dogPaws.position.x = Math.sin(time * 20.0) * 0.04;
+        this.dogPaws.position.y = 1.2 + Math.abs(Math.sin(time * 26.0)) * 0.04;
       }
 
-      if (this.dogHead) {
-        this.dogHead.rotation.z = Math.sin(time * 12.0) * 0.08;
+      if (this.dogTongue) {
+        this.dogTongue.rotation.x = 0.25 + Math.sin(time * 26.0) * 0.1;
       }
-    } else if (this.dogState === 'celebrating') {
+
+      // 脑袋得意晃脑
+      if (this.dogHead) {
+        this.dogHead.rotation.z = Math.sin(time * 13.0) * 0.12;
+      }
+      return;
+    }
+
+    if (this.dogState === 'celebrating') {
+      this.dogCurrentY += (this.dogTargetY - this.dogCurrentY) * Math.min(1.0, delta * 12.0);
+      this.dogGroup.position.y = this.dogCurrentY;
       if (this.dogHead) {
         this.dogHead.rotation.z = Math.sin(time * 6.0) * 0.05;
       }
+      return;
+    }
+
+    // 默认隐蔽态
+    if (this.dogState === 'hidden') {
+      this.dogGroup.visible = false;
+      this.dogGroup.position.y = -3.2;
     }
   }
 
@@ -1125,7 +1286,9 @@ export class DuckHuntEngine {
     this.isWaveActive = false;
     this.isFlyAway = false;
     this.dogState = 'hidden';
-    this.dogTargetY = -2.2;
-    this.dogCurrentY = -2.2;
+    this.dogGroup.visible = false;
+    this.dogTargetY = -3.2;
+    this.dogCurrentY = -3.2;
+    this.dogGroup.position.set(0, -3.2, this.getStageZ() - 0.05);
   }
 }

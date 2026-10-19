@@ -1612,24 +1612,75 @@ body {
    NES 复古打鸭子 HUD 面板样式
    ========================================================================== */
 
-/* 打鸭子模式下，将底部控制栏抬高至 NES HUD 之上，彻底杜绝按钮与记分牌遮挡重叠 */
+/* ==========================================================================
+   FC 经典打鸭子模式专用 HUD 布局与防遮挡优化 (body.duckhunt-active)
+   ========================================================================== */
+
+/* 1. 隐藏 360 度沙盒模式特有的右上角数据卡片、中央遥测与战术部件 */
+body.duckhunt-active #modern-stats-wrapper,
+body.duckhunt-active #top-center-telemetry,
+body.duckhunt-active #indicator-container,
+body.duckhunt-active #joystick-zone,
+body.duckhunt-active #peek-controller,
+body.duckhunt-active #weapon-dock {
+  display: none !important;
+}
+
+/* 2. 顶栏在打鸭子模式下纯净展示模式药丸 */
+body.duckhunt-active #top-bar {
+  justify-content: flex-start;
+  padding: 8px 16px;
+}
+
+/* 3. 底部控制栏容器变为透传绝对布局，按钮各归其位 */
 body.duckhunt-active #bottom-bar {
-  margin-bottom: 74px;
-  padding-bottom: 2px;
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100vw;
+  height: 90px;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+  background: transparent;
+  display: block;
   z-index: 35;
-  pointer-events: auto;
 }
 
-@media (orientation: landscape) {
-  body.duckhunt-active #bottom-bar {
-    margin-bottom: 0;
-  }
-}
-
-.nes-hud {
+/* 底部功能按钮：定格校准与音效移至屏幕左下角并排 */
+body.duckhunt-active #recalibrate-btn {
   position: absolute;
-  left: 50%;
+  left: max(16px, env(safe-area-inset-left, 16px));
   bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  width: 68px;
+  height: 52px;
+  pointer-events: auto;
+  z-index: 36;
+}
+
+body.duckhunt-active #sound-btn {
+  position: absolute;
+  left: calc(max(16px, env(safe-area-inset-left, 16px)) + 76px);
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  width: 68px;
+  height: 52px;
+  pointer-events: auto;
+  z-index: 36;
+}
+
+/* 大号开火按钮：置于屏幕右下角 */
+body.duckhunt-active #fire-btn {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right, 16px));
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  pointer-events: auto;
+  z-index: 36;
+  margin: 0;
+}
+
+/* NES 经典状态栏居中，独立于按键互不遮挡 */
+.nes-hud {
+  position: fixed;
+  left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -1640,8 +1691,26 @@ body.duckhunt-active #bottom-bar {
   padding: 8px 14px;
   font-family: 'Courier New', Courier, monospace;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 10px rgba(255, 255, 255, 0.2);
-  z-index: 28;
-  max-width: 95vw;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+/* 横屏模式下：NES 状态栏沉底居中 (与左侧校准/音效、右侧FIRE并排，留足空隙) */
+@media (orientation: landscape) {
+  body.duckhunt-active .nes-hud {
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    padding: 6px 12px;
+    gap: 10px;
+    max-width: 55vw;
+  }
+}
+
+/* 竖屏模式下：NES 状态栏位于底部按钮正上方 (bottom: 84px)，上下错落不重叠 */
+@media (orientation: portrait) {
+  body.duckhunt-active .nes-hud {
+    bottom: 84px;
+    max-width: 95vw;
+  }
 }
 
 .nes-hud-section {

@@ -73,6 +73,7 @@ class ArShooterGame {
   private modernScoreCardEl: HTMLElement | null;
   private modernCenterStatusEl: HTMLElement | null;
   private modernTargetsCardEl: HTMLElement | null;
+  private modernStatsWrapperEl: HTMLElement | null;
 
   // 顶栏实时健康与护盾监控 DOM
   private fenceHpContainerEl: HTMLElement | null;
@@ -152,6 +153,7 @@ class ArShooterGame {
     this.modernScoreCardEl = document.getElementById('modern-score-card');
     this.modernCenterStatusEl = document.getElementById('modern-center-status');
     this.modernTargetsCardEl = document.getElementById('modern-targets-card');
+    this.modernStatsWrapperEl = document.getElementById('modern-stats-wrapper');
 
     this.fenceHpContainerEl = document.getElementById('fence-hp-bar-container');
     this.fenceHpFillEl = document.getElementById('fence-hp-fill');
@@ -541,6 +543,7 @@ class ArShooterGame {
       this.weaponManager.setVisible(false);
 
       // 2. 隐藏 360 度独有 HUD 与控制部件
+      this.modernStatsWrapperEl?.classList.add('hidden');
       this.modernScoreCardEl?.classList.add('hidden');
       this.modernCenterStatusEl?.classList.add('hidden');
       this.modernTargetsCardEl?.classList.add('hidden');
@@ -571,6 +574,7 @@ class ArShooterGame {
       this.flyAwayBannerEl.classList.add('hidden');
 
       // 2. 恢复 360 度沙盒 HUD 与控制部件
+      this.modernStatsWrapperEl?.classList.remove('hidden');
       this.modernScoreCardEl?.classList.remove('hidden');
       this.modernCenterStatusEl?.classList.remove('hidden');
       this.modernTargetsCardEl?.classList.remove('hidden');
