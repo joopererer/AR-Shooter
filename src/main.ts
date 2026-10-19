@@ -379,6 +379,8 @@ class ArShooterGame {
     }
 
     const activeCam = this.getActiveCamera();
+    const camWorldPos = new THREE.Vector3();
+    activeCam.getWorldPosition(camWorldPos);
 
     // 从屏幕中心检测射线命中 (使用当前真实活动相机)
     this.raycaster.setFromCamera(this.centerNdc, activeCam);
@@ -393,10 +395,10 @@ class ArShooterGame {
       this.handleHitFeedback(hitTarget, hitRes.killed || false);
       this.playHitSound();
     } else {
-      endPoint = activeCam.position.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(20));
+      endPoint = camWorldPos.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(20));
     }
 
-    this.createLaserBeam(activeCam.position, endPoint);
+    this.createLaserBeam(camWorldPos, endPoint);
   }
 
   /**
@@ -664,6 +666,10 @@ class ArShooterGame {
     if (this.virtualJoystick.getIsVisible() && this.isGameRunning) {
       this.virtualJoystick.applyMovement(this.playerRig, activeCam, delta, 4.0);
     }
+
+    // 核心关键：强制刷新整个三维空间图的世界矩阵！
+    // 确保相机与 Rig 移动后的世界坐标即时同步，彻底杜绝准星空锁与判定错位！
+    this.scene.updateMatrixWorld(true);
 
     // 3. 更新怪物动画与 FOV 衰减 (使用当前真实活动相机)
     this.monsterManager.update(delta, elapsed, activeCam);

@@ -44,6 +44,7 @@ export class MonsterManager {
   private explosionParticles: THREE.Points[] = [];
 
   // 临时向量，避免每帧 GC
+  private readonly tempCamWorldPos = new THREE.Vector3();
   private readonly tempCamDir = new THREE.Vector3();
   private readonly tempMonsterDir = new THREE.Vector3();
 
@@ -63,7 +64,7 @@ export class MonsterManager {
 
   /**
    * 在玩家周围空间球面/环状区域随机生成一只具有赛博能量生物造型的怪物
-   * 半径 R in [6, 12] 米，仰角 -30度 ~ +45度，水平角 0 ~ 360度
+   * 半径 R in [2.8, 6.2] 米，仰角 -30度 ~ +45度，水平角 0 ~ 360度
    */
   public spawnMonster(): MonsterEntity {
     // 缩短生成半径至 2.8 ~ 6.2 米，使得空间走步或摇杆推进时近大远小肉眼极其明显
@@ -205,6 +206,8 @@ export class MonsterManager {
    * 每一帧更新怪物位置、动画、FOV 点积边缘平滑衰减与粒子效果
    */
   public update(delta: number, elapsed: number, camera: THREE.Camera): void {
+    // 关键修复：获取相机的真实世界三维坐标与世界朝向，消除父级 Rig 导致的世界/局部坐标脱节
+    camera.getWorldPosition(this.tempCamWorldPos);
     camera.getWorldDirection(this.tempCamDir);
 
     for (let i = this.monsters.length - 1; i >= 0; i--) {
@@ -221,19 +224,21 @@ export class MonsterManager {
       m.meshGroup.rotation.y += m.rotSpeed.y * delta;
       m.meshGroup.rotation.z += m.rotSpeed.z * delta;
 
-      // 3. FOV 点积边缘连续平滑衰减 (消除临界跳动闪烁)
-      this.tempMonsterDir.copy(m.currentPosition).sub(camera.position).normalize();
+      // 3. 计算真实世界空间中相机指向怪物的向量与距离
+      this.tempMonsterDir.copy(m.currentPosition).sub(this.tempCamWorldPos);
+      const distToCam = this.tempMonsterDir.length();
+      this.tempMonsterDir.normalize();
+
       const dot = this.tempCamDir.dot(this.tempMonsterDir);
 
-      // 3. FOV 点积边缘透明度控制：
-      // 只要怪物在相机前方视界 (dot >= 0.25) 或位于 5 米内，保持 100% 鲜艳可见；
-      // 仅在完全转至玩家脑后 (dot < -0.1) 时才做后方淡隐，彻底消除怪物离奇隐形的问题！
-      const distToCam = camera.position.distanceTo(m.currentPosition);
+      // 4. FOV 透明度控制：
+      // 只要怪物在相机前方视界 (dot >= 0.05) 或位于 6.0 米内，100% 保持清晰可见；
+      // 彻底解决走动时怪物突然凭空消失隐形的严重问题！
       let targetOpacity = 1.0;
-      if (distToCam <= 5.0 || dot >= 0.25) {
+      if (distToCam <= 6.0 || dot >= 0.05) {
         targetOpacity = 1.0;
-      } else if (dot >= -0.1) {
-        const t = (dot - (-0.1)) / (0.25 - (-0.1));
+      } else if (dot >= -0.2) {
+        const t = (dot - (-0.2)) / (0.05 - (-0.2));
         targetOpacity = t * t * (3 - 2 * t);
       } else {
         targetOpacity = 0.0;

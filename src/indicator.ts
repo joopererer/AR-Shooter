@@ -13,6 +13,7 @@ export class IndicatorManager {
   private frustum = new THREE.Frustum();
   private projScreenMatrix = new THREE.Matrix4();
   private localPos = new THREE.Vector3();
+  private camWorldPos = new THREE.Vector3();
 
   // 箭头 DOM 元素缓存池: monsterId -> HTMLDivElement
   private indicatorElements = new Map<string, HTMLElement>();
@@ -99,8 +100,9 @@ export class IndicatorManager {
       // 箭头自身旋转角度 (SVG 默认向右指向 0 度，故直接旋转 theta)
       const rotDeg = theta * (180 / Math.PI);
 
-      // 计算怪物与相机的直线欧氏距离
-      const distance = camera.position.distanceTo(monster.currentPosition);
+      // 关键修复：计算怪物与相机的真实世界欧氏距离
+      camera.getWorldPosition(this.camWorldPos);
+      const distance = this.camWorldPos.distanceTo(monster.currentPosition);
 
       // 获取或创建 DOM 元素并更新位置
       const el = this.getOrCreateIndicator(monster.id);
