@@ -165,6 +165,10 @@ export class IndicatorManager {
     }
   }
 
+  public clear(): void {
+    this.dispose();
+  }
+
   /**
    * 清除并释放所有指示器
    */

@@ -1172,6 +1172,610 @@ body {
 }
 
 /* ==========================================================================
+   二级游戏大厅 (Game Hub) 样式
+   ========================================================================== */
+
+.hub-entry-pill {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.28), rgba(202, 138, 4, 0.16)) !important;
+  border: 1px solid rgba(250, 204, 21, 0.55) !important;
+  color: #fef08a !important;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.25);
+}
+
+.hub-entry-pill:active {
+  transform: scale(0.94);
+  background: rgba(234, 179, 8, 0.45) !important;
+}
+
+.hub-modal-card {
+  max-width: 680px !important;
+  width: 95vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px !important;
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.96), rgba(8, 14, 26, 0.96)) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(56, 189, 248, 0.2) !important;
+}
+
+.hub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 14px;
+}
+
+.hub-title-box {
+  text-align: left;
+}
+
+.hub-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.hub-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.hub-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.hub-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hub-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.hub-scroll-body {
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hub-scroll-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.hub-scroll-body::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 3px;
+}
+
+.hub-category-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+}
+
+.hub-category-section.retro-section {
+  background: linear-gradient(145deg, rgba(22, 101, 52, 0.15), rgba(15, 23, 42, 0.3));
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.category-icon {
+  font-size: 24px;
+}
+
+.category-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.category-desc {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.hub-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.hub-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  transition: all 0.25s ease;
+}
+
+.hub-card:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.18);
+  transform: translateY(-2px);
+}
+
+.hub-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-icon {
+  font-size: 22px;
+}
+
+.card-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.card-hi {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #eab308;
+}
+
+.card-title {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.card-desc {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+  flex-grow: 1;
+}
+
+.hub-launch-btn {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  border: 1px solid #38bdf8;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.hub-launch-btn:active {
+  transform: scale(0.96);
+  background: #0284c7;
+}
+
+/* 复古打鸭子卡片 */
+.retro-hunt-card {
+  background: rgba(10, 20, 15, 0.85);
+  border: 2px solid #22c55e;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.retro-card-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.retro-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.retro-banner-icon {
+  font-size: 32px;
+}
+
+.retro-banner-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #4ade80;
+  letter-spacing: 0.5px;
+}
+
+.retro-banner-desc {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #a7f3d0;
+}
+
+.retro-hi-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: #000000;
+  border: 2px solid #ffffff;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.retro-hi-box .hi-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: #22c55e;
+}
+
+.retro-hi-box .hi-val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.duck-submodes-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.duck-submode-btn {
+  background: #000000;
+  border: 2px solid #22c55e;
+  color: #ffffff;
+  padding: 10px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.duck-submode-btn:hover {
+  background: #14532d;
+  border-color: #4ade80;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+  transform: translateY(-2px);
+}
+
+.duck-submode-btn:active {
+  transform: scale(0.95);
+}
+
+.duck-submode-btn .submode-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4ade80;
+}
+
+.duck-submode-btn .submode-detail {
+  font-size: 10px;
+  color: #cbd5e1;
+}
+
+/* ==========================================================================
+   NES 复古打鸭子 HUD 面板样式
+   ========================================================================== */
+
+.nes-hud {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #000000;
+  border: 3px solid #ffffff;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-family: 'Courier New', Courier, monospace;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 10px rgba(255, 255, 255, 0.2);
+  z-index: 25;
+}
+
+.nes-hud-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nes-label {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.nes-label.green {
+  color: #22c55e;
+}
+
+.nes-label.blue {
+  color: #38bdf8;
+}
+
+.nes-label.white {
+  color: #ffffff;
+}
+
+.nes-val {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.nes-val.green {
+  color: #22c55e;
+}
+
+.nes-val.white {
+  color: #ffffff;
+  letter-spacing: 2px;
+}
+
+/* 子弹剩余 */
+.nes-shot-box {
+  border-left: 2px solid #334155;
+  border-right: 2px solid #334155;
+  padding: 0 10px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nes-shot-icons {
+  display: flex;
+  gap: 4px;
+}
+
+.nes-bullet {
+  width: 8px;
+  height: 14px;
+  background: #334155;
+  border-radius: 2px 2px 0 0;
+  transition: background 0.15s ease;
+}
+
+.nes-bullet.active {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+/* 10 个命中格子 */
+.nes-hit-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.nes-hit-slots {
+  display: flex;
+  gap: 3px;
+}
+
+.nes-target-slot {
+  width: 11px;
+  height: 12px;
+  border: 1px solid #ffffff;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1px;
+}
+
+.nes-target-slot.active {
+  background: #22c55e;
+  animation: nes-slot-blink 0.35s infinite alternate;
+}
+
+.nes-target-slot.hit {
+  background: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+
+.nes-target-slot.miss {
+  background: #ffffff;
+}
+
+@keyframes nes-slot-blink {
+  0% { opacity: 0.2; }
+  100% { opacity: 1.0; }
+}
+
+.nes-pass-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  position: relative;
+}
+
+.nes-pass-indicator {
+  position: absolute;
+  bottom: -4px;
+  width: 2px;
+  height: 6px;
+  background: #38bdf8;
+  box-shadow: 0 0 4px #38bdf8;
+}
+
+/* 逃脱标语 (FLY AWAY!) */
+.fly-away-banner {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000000;
+  border: 3px solid #f472b6;
+  color: #f472b6;
+  padding: 6px 18px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 20px rgba(244, 114, 182, 0.6);
+  animation: nes-flyaway-glow 0.4s infinite alternate;
+  z-index: 30;
+}
+
+@keyframes nes-flyaway-glow {
+  0% { transform: translateX(-50%) scale(0.96); box-shadow: 0 0 10px rgba(244, 114, 182, 0.4); }
+  100% { transform: translateX(-50%) scale(1.04); box-shadow: 0 0 24px rgba(244, 114, 182, 0.9); }
+}
+
+/* CRT 光线枪 50ms 白屏瞬间闪烁层 */
+.crt-flash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: #ffffff;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+/* NES Game Over 弹窗 */
+.nes-modal-card {
+  background: #000000 !important;
+  border: 4px solid #ffffff !important;
+  border-radius: 6px !important;
+  padding: 24px 20px !important;
+  max-width: 380px !important;
+  font-family: 'Courier New', Courier, monospace;
+  box-shadow: 0 0 35px rgba(0, 0, 0, 0.95) !important;
+}
+
+.nes-pixel-title {
+  color: #ef4444;
+  font-size: 26px;
+  margin: 0 0 16px 0;
+  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+}
+
+.nes-stats-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: #111827;
+  padding: 12px;
+  border: 2px solid #374151;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.nes-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nes-stat-label {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.nes-stat-val {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.nes-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nes-btn {
+  background: #000000;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  padding: 10px 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.nes-retry-btn {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #000000;
+}
+
+.nes-retry-btn:hover {
+  background: #4ade80;
+}
+
+.nes-hub-btn:hover {
+  background: #374151;
+}
+
+/* ==========================================================================
    横屏沉浸式作战布局 (Landscape Combat Layout) - 位于文件末尾确保绝对覆盖
    - 左翼：闪身探头面板位于 left: max(16px, env(safe-area-inset-left, 16px)); bottom: 95px; (绝不超出左边界)
    - 右翼：武器切换基座位于 right: max(16px, env(safe-area-inset-right, 16px)); bottom: 95px;
@@ -1388,5 +1992,48 @@ body {
   .start-btn {
     padding: 10px 16px;
     font-size: 14px;
+  }
+
+  /* 大厅与打鸭子横屏适配 */
+  .hub-modal-card {
+    max-width: 740px !important;
+    max-height: 94vh !important;
+    padding: 12px 18px !important;
+  }
+
+  .hub-header {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  .hub-title {
+    font-size: 18px;
+  }
+
+  .hub-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .hub-card {
+    padding: 8px 10px;
+  }
+
+  .retro-hunt-card {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .nes-hud {
+    bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    padding: 4px 12px;
+    gap: 10px;
+    transform: translateX(-50%) scale(0.92);
+  }
+
+  .fly-away-banner {
+    top: 48px;
+    font-size: 16px;
+    padding: 4px 12px;
   }
 }

@@ -374,4 +374,317 @@ export class AudioManager {
       osc.stop(now + 0.16);
     } catch {}
   }
+
+  // ==========================================================================
+  // FC 经典打鸭子 (Duck Hunt 1984) 8-Bit 原生音效合成
+  // ==========================================================================
+
+  /**
+   * 8-Bit NES 复古光线枪 (Zapper) 射击声 (带杂音的经典脆响)
+   */
+  public playNesGunshot(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 方波瞬态滑降
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(980, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+
+      gain.gain.setValueAtTime(0.45, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+
+      // 白噪声枪口爆裂
+      const bufSize = Math.floor(this.ctx.sampleRate * 0.06);
+      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buf;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.35, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      noise.connect(noiseGain);
+      noiseGain.connect(this.ctx.destination);
+      noise.start(now);
+    } catch {}
+  }
+
+  /**
+   * 鸭子拍翼/振翅扑打声 (短促低沉方波)
+   */
+  public playNesFlap(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    } catch {}
+  }
+
+  /**
+   * 鸭子嘎嘎叫声 (双音调鼻音方波)
+   */
+  public playNesQuack(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      [0, 0.08].forEach((offset) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(740, now + offset);
+        osc.frequency.exponentialRampToValueAtTime(520, now + offset + 0.06);
+
+        gain.gain.setValueAtTime(0.18, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.06);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.07);
+      });
+    } catch {}
+  }
+
+  /**
+   * 鸭子中弹坠落经典下滑口哨声 (1200Hz 优雅滑降至 160Hz)
+   */
+  public playNesDuckFall(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1180, now);
+      osc.frequency.exponentialRampToValueAtTime(160, now + 0.55);
+
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.56);
+    } catch {}
+  }
+
+  /**
+   * 猎犬出场/回合开局 8-Bit 经典短旋律
+   */
+  public playNesDogIntro(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const notes = [
+        { f: 523.25, d: 0.1 },  // C5
+        { f: 659.25, d: 0.1 },  // E5
+        { f: 783.99, d: 0.1 },  // G5
+        { f: 1046.5, d: 0.22 }, // C6
+      ];
+      let t = this.ctx.currentTime;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(n.f, t);
+
+        gain.gain.setValueAtTime(0.22, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d;
+      });
+    } catch {}
+  }
+
+  /**
+   * 猎犬高举战利品欢快胜利小号声 (Fanfare)
+   */
+  public playNesDogCatch(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const notes = [
+        { f: 587.33, d: 0.08 }, // D5
+        { f: 739.99, d: 0.08 }, // F#5
+        { f: 880.0, d: 0.08 },  // A5
+        { f: 1174.66, d: 0.28 },// D6
+      ];
+      let t = this.ctx.currentTime;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(n.f, t);
+
+        gain.gain.setValueAtTime(0.24, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d;
+      });
+    } catch {}
+  }
+
+  /**
+   * 猎犬经典魔性捂嘴嘲笑声 (8-Bit Staccato Snicker)
+   * 快速交替的双音脉冲 (Ha-Ha-Ha-Ha-Ha-Ha!)
+   */
+  public playNesDogLaugh(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      let t = this.ctx.currentTime;
+      const pitches = [880, 1175, 880, 1175, 880, 1175, 880, 1175];
+      pitches.forEach((freq) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.26, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.08);
+        t += 0.09;
+      });
+    } catch {}
+  }
+
+  /**
+   * 飞盘弹射与空中破片爆炸声
+   */
+  public playNesClayLaunch(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(120, now);
+      osc.frequency.exponentialRampToValueAtTime(420, now + 0.15);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.16);
+    } catch {}
+  }
+
+  public playNesClayHit(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(360, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.2);
+
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.21);
+    } catch {}
+  }
+
+  /**
+   * 满贯 PERFECT 奖励胜利大调长音
+   */
+  public playNesPerfect(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const notes = [
+        { f: 523.25, d: 0.12 },
+        { f: 659.25, d: 0.12 },
+        { f: 783.99, d: 0.12 },
+        { f: 1046.5, d: 0.12 },
+        { f: 1318.5, d: 0.35 },
+      ];
+      let t = this.ctx.currentTime;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(n.f, t);
+        gain.gain.setValueAtTime(0.28, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d;
+      });
+    } catch {}
+  }
+
+  /**
+   * 未达标 GAME OVER 悲伤滑降
+   */
+  public playNesGameOver(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const notes = [
+        { f: 493.88, d: 0.18 }, // B4
+        { f: 466.16, d: 0.18 }, // Bb4
+        { f: 440.0, d: 0.18 },  // A4
+        { f: 415.3, d: 0.45 },  // Ab4
+      ];
+      let t = this.ctx.currentTime;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(n.f, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d;
+      });
+    } catch {}
+  }
 }
+

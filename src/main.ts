@@ -1,7 +1,7 @@
 /**
  * AR 空间射手 - 主游戏控制器 (main.ts)
- * 整合 V2.0 荒野狩猎生态、树木巨石掩体、歪头探身 (Roll-to-Peek)、
- * 多武器视模 (步枪/霰弹/穿甲狙+光学变焦)、零音频依赖合成引擎与体感切枪系统。
+ * 整合 V3.0 二级游戏大厅 (Game Hub)、FC 经典打鸭子 (Duck Hunt 1984 1:1复刻)、
+ * 360° 全景射击沙盒、体感切枪、歪头探身与 WebXR 空间位移推进。
  */
 
 import * as THREE from 'three';
@@ -14,8 +14,9 @@ import { AudioManager } from './audio';
 import { EnvironmentManager } from './environment';
 import { EntityManager, GameEntity } from './entities';
 import { WeaponManager, WeaponType, WeaponConfig } from './weapons';
-import { ModeManager, GameMode } from './modes';
+import { ModeManager, GameMode } from './modeManager';
 import { CockpitManager } from './cockpit';
+import { DuckHuntEngine, DuckHuntHUDState } from './duckHunt';
 
 export type LocomotionMode = 'joystick' | 'webxr' | 'stationary';
 
@@ -44,6 +45,7 @@ class ArShooterGame {
   private weaponManager: WeaponManager;
   private cockpitManager: CockpitManager;
   private modeManager: ModeManager;
+  private duckHuntEngine: DuckHuntEngine;
 
   // 控制模式与状态
   private locomotionMode: LocomotionMode = 'joystick';
@@ -56,7 +58,8 @@ class ArShooterGame {
   private laserGroup = new THREE.Group();
   private activeLasers: { mesh: THREE.Mesh; life: number; maxLife: number }[] = [];
 
-  // DOM 节点引用
+  // DOM 节点引用 - 核心顶栏与 360 HUD
+  private hubBtnEl: HTMLElement;
   private scoreValEl: HTMLElement;
   private targetsValEl: HTMLElement;
   private statusBadgeEl: HTMLElement;
@@ -67,6 +70,9 @@ class ArShooterGame {
   private modeSwitchBtnEl: HTMLElement;
   private modePillIconEl: HTMLElement;
   private modePillTextEl: HTMLElement;
+  private modernScoreCardEl: HTMLElement;
+  private modernCenterStatusEl: HTMLElement;
+  private modernTargetsCardEl: HTMLElement;
   private crosshairEl: HTMLElement;
   private lockHintEl: HTMLElement;
   private friendlyBadgeEl: HTMLElement;
@@ -80,20 +86,46 @@ class ArShooterGame {
   private soundIconOnEl: HTMLElement;
   private soundIconOffEl: HTMLElement;
 
-  // V2.0 扩展 DOM
+  // 360 度特有控制部件
+  private peekControllerEl: HTMLElement;
   private peekLeftBtnEl: HTMLElement;
   private peekCenterBtnEl: HTMLElement;
   private peekRightBtnEl: HTMLElement;
   private peekSliderEl: HTMLInputElement;
   private peekValTextEl: HTMLElement;
+  private weaponDockEl: HTMLElement;
   private weaponBtnEls: NodeListOf<HTMLButtonElement>;
   private sniperScopeEl: HTMLElement;
   private scopeTargetTextEl: HTMLElement;
   private friendlyFlashEl: HTMLElement;
   private cameraBgEl: HTMLElement;
 
+  // 二级游戏大厅 DOM
+  private gameHubModalEl: HTMLElement;
+  private hubCloseBtnEl: HTMLElement;
+  private hubLaunchBtnEls: NodeListOf<HTMLButtonElement>;
+  private duckSubmodeBtnEls: NodeListOf<HTMLButtonElement>;
+
+  // NES 复古打鸭子 HUD 与弹窗 DOM
+  private nesHudEl: HTMLElement;
+  private nesRoundValEl: HTMLElement;
+  private nesShotIconsEl: HTMLElement;
+  private nesHitSlotsEl: HTMLElement;
+  private nesPassMarkerEl: HTMLElement;
+  private nesScoreValEl: HTMLElement;
+  private flyAwayBannerEl: HTMLElement;
+  private crtFlashEl: HTMLElement;
+  private nesGameoverModalEl: HTMLElement;
+  private nesModalTitleEl: HTMLElement;
+  private nesFinalScoreEl: HTMLElement;
+  private nesFinalRoundEl: HTMLElement;
+  private nesFinalBestEl: HTMLElement;
+  private nesRetryBtnEl: HTMLElement;
+  private nesHubReturnBtnEl: HTMLElement;
+
   constructor() {
     // 1. 获取核心 HUD DOM 节点
+    this.hubBtnEl = document.getElementById('hub-btn')!;
     this.scoreValEl = document.getElementById('score-val')!;
     this.targetsValEl = document.getElementById('targets-val')!;
     this.statusBadgeEl = document.getElementById('status-badge')!;
@@ -104,6 +136,9 @@ class ArShooterGame {
     this.modeSwitchBtnEl = document.getElementById('mode-switch-btn')!;
     this.modePillIconEl = document.getElementById('mode-pill-icon')!;
     this.modePillTextEl = document.getElementById('mode-pill-text')!;
+    this.modernScoreCardEl = document.getElementById('modern-score-card')!;
+    this.modernCenterStatusEl = document.getElementById('modern-center-status')!;
+    this.modernTargetsCardEl = document.getElementById('modern-targets-card')!;
     this.crosshairEl = document.getElementById('crosshair')!;
     this.lockHintEl = document.getElementById('lock-hint')!;
     this.friendlyBadgeEl = document.getElementById('friendly-warning-badge')!;
@@ -117,17 +152,42 @@ class ArShooterGame {
     this.soundIconOnEl = document.getElementById('sound-icon-on')!;
     this.soundIconOffEl = document.getElementById('sound-icon-off')!;
 
-    // V2.0 节点
+    // 360 度特有控制部件
+    this.peekControllerEl = document.getElementById('peek-controller')!;
     this.peekLeftBtnEl = document.getElementById('peek-left-btn')!;
     this.peekCenterBtnEl = document.getElementById('peek-center-btn')!;
     this.peekRightBtnEl = document.getElementById('peek-right-btn')!;
     this.peekSliderEl = document.getElementById('peek-slider') as HTMLInputElement;
     this.peekValTextEl = document.getElementById('peek-val-text')!;
+    this.weaponDockEl = document.getElementById('weapon-dock')!;
     this.weaponBtnEls = document.querySelectorAll('.weapon-btn');
     this.sniperScopeEl = document.getElementById('sniper-scope-overlay')!;
     this.scopeTargetTextEl = document.getElementById('scope-target-text')!;
     this.friendlyFlashEl = document.getElementById('friendly-flash-overlay')!;
     this.cameraBgEl = document.getElementById('camera-bg')!;
+
+    // 二级游戏大厅 DOM
+    this.gameHubModalEl = document.getElementById('game-hub-modal')!;
+    this.hubCloseBtnEl = document.getElementById('hub-close-btn')!;
+    this.hubLaunchBtnEls = document.querySelectorAll('.hub-launch-btn');
+    this.duckSubmodeBtnEls = document.querySelectorAll('.duck-submode-btn');
+
+    // NES 打鸭子 HUD DOM
+    this.nesHudEl = document.getElementById('nes-hud')!;
+    this.nesRoundValEl = document.getElementById('nes-round-val')!;
+    this.nesShotIconsEl = document.getElementById('nes-shot-icons')!;
+    this.nesHitSlotsEl = document.getElementById('nes-hit-slots')!;
+    this.nesPassMarkerEl = document.getElementById('nes-pass-marker')!;
+    this.nesScoreValEl = document.getElementById('nes-score-val')!;
+    this.flyAwayBannerEl = document.getElementById('fly-away-banner')!;
+    this.crtFlashEl = document.getElementById('crt-flash-overlay')!;
+    this.nesGameoverModalEl = document.getElementById('nes-gameover-modal')!;
+    this.nesModalTitleEl = document.getElementById('nes-modal-title')!;
+    this.nesFinalScoreEl = document.getElementById('nes-final-score')!;
+    this.nesFinalRoundEl = document.getElementById('nes-final-round')!;
+    this.nesFinalBestEl = document.getElementById('nes-final-best')!;
+    this.nesRetryBtnEl = document.getElementById('nes-retry-btn')!;
+    this.nesHubReturnBtnEl = document.getElementById('nes-hub-return-btn')!;
 
     // 2. 初始化 Three.js 场景与玩家 Rig 控制容器
     this.scene = new THREE.Scene();
@@ -172,7 +232,14 @@ class ArShooterGame {
     );
     this.weaponManager = new WeaponManager(this.camera, (cfg) => this.onWeaponSwitched(cfg));
     this.cockpitManager = new CockpitManager(this.camera);
-    this.modeManager = new ModeManager('hunting', (mode) => this.onModeSwitched(mode));
+    this.modeManager = new ModeManager('hunting');
+
+    // 初始化 FC 经典打鸭子引擎
+    this.duckHuntEngine = new DuckHuntEngine(this.scene, this.camera, this.audioManager, {
+      onHUDUpdate: (s) => this.updateNesHUD(s),
+      onGameOver: (sc, r) => this.handleDuckHuntGameOver(sc, r),
+      onRoundClear: (r, b) => this.handleDuckHuntRoundClear(r, b),
+    });
 
     // WebXR 会话管理器
     this.webxrManager = new WebXRManager(this.renderer, {
@@ -199,9 +266,6 @@ class ArShooterGame {
       },
     });
 
-    // 初始场景生态生成
-    this.applyCurrentModeContent('hunting');
-
     // 7. 绑定所有 UI 与体感控制事件
     this.bindEvents();
     this.checkSecurityContext();
@@ -211,9 +275,6 @@ class ArShooterGame {
     this.renderer.setAnimationLoop(this.animate);
   }
 
-  /**
-   * 获取当前有效用于视野判断的相机
-   */
   public getActiveCamera(): THREE.Camera {
     if (this.renderer.xr.enabled && this.renderer.xr.isPresenting) {
       return this.renderer.xr.getCamera();
@@ -254,8 +315,51 @@ class ArShooterGame {
   private bindEvents(): void {
     window.addEventListener('resize', () => this.handleResize(), false);
 
-    // 开启游戏
+    // 授权并开启游戏大厅
     this.startBtnEl.addEventListener('click', () => this.handleGameStart());
+
+    // 🏠 打开游戏大厅按钮
+    this.hubBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openGameHub();
+    });
+
+    // ✕ 关闭游戏大厅按钮
+    this.hubCloseBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeGameHub();
+    });
+
+    // 大厅 360 度模式卡片点击进入
+    this.hubLaunchBtnEls.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = btn.dataset.mode as GameMode;
+        if (mode) this.launchMode(mode);
+      });
+    });
+
+    // 大厅打鸭子子模式选择按钮
+    this.duckSubmodeBtnEls.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = btn.dataset.mode as GameMode;
+        if (mode) this.launchMode(mode);
+      });
+    });
+
+    // NES Game Over 重玩与返回大厅
+    this.nesRetryBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.nesGameoverModalEl.classList.add('hidden');
+      this.launchMode(this.modeManager.getMode());
+    });
+
+    this.nesHubReturnBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.nesGameoverModalEl.classList.add('hidden');
+      this.openGameHub();
+    });
 
     // 开火按钮
     this.fireBtnEl.addEventListener('pointerdown', (e) => {
@@ -272,7 +376,8 @@ class ArShooterGame {
         target.closest('#top-bar') ||
         target.closest('#joystick-zone') ||
         target.closest('#peek-controller') ||
-        target.closest('#weapon-dock')
+        target.closest('#weapon-dock') ||
+        target.closest('.modal-overlay')
       ) {
         return;
       }
@@ -282,7 +387,7 @@ class ArShooterGame {
     // 游戏模式切换 (荒野狩猎 / 星际防卫 / 幽灵猎手)
     this.gameModeBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.modeManager.switchNextMode();
+      this.openGameHub();
     });
 
     // 空间位移模式切换 (摇杆推进 / WebXR 空间走动)
@@ -349,11 +454,291 @@ class ArShooterGame {
     this.peekSliderEl.value = val.toString();
   }
 
-  /**
-   * 当切换武器时回调
-   */
+  // ==========================================================================
+  // 模式启动与二级大厅管理
+  // ==========================================================================
+
+  public openGameHub(): void {
+    this.refreshHubHighScores();
+    this.gameHubModalEl.classList.remove('hidden');
+  }
+
+  public closeGameHub(): void {
+    this.gameHubModalEl.classList.add('hidden');
+  }
+
+  private refreshHubHighScores(): void {
+    const huntingHi = this.modeManager.getHighScore('hunting');
+    const scifiHi = this.modeManager.getHighScore('scifi');
+    const ghostHi = this.modeManager.getHighScore('ghost');
+    const duckHi = Math.max(
+      this.modeManager.getHighScore('duckhunt_a'),
+      this.modeManager.getHighScore('duckhunt_b'),
+      this.modeManager.getHighScore('duckhunt_c')
+    );
+
+    const elH = document.getElementById('hub-hi-hunting');
+    if (elH) elH.textContent = huntingHi.toString();
+    const elS = document.getElementById('hub-hi-scifi');
+    if (elS) elS.textContent = scifiHi.toString();
+    const elG = document.getElementById('hub-hi-ghost');
+    if (elG) elG.textContent = ghostHi.toString();
+    const elD = document.getElementById('hub-hi-duckhunt');
+    if (elD) elD.textContent = duckHi.toString().padStart(6, '0');
+  }
+
+  public launchMode(mode: GameMode): void {
+    this.closeGameHub();
+    this.nesGameoverModalEl.classList.add('hidden');
+    this.modeManager.setMode(mode);
+    const cfg = this.modeManager.getModeConfig(mode);
+
+    this.gameModeIconEl.textContent = cfg.icon;
+    this.gameModeTextEl.textContent = cfg.shortName;
+
+    if (cfg.isRetroLightGun) {
+      // 1. 彻底清空 360 沙盒环境与生态实体
+      this.environmentManager.clearEnvironment();
+      this.entityManager.clearAll();
+      this.cockpitManager.setVisible(false);
+      this.weaponManager.setVisible(false);
+
+      // 2. 隐藏 360 度独有 HUD 与控制部件
+      this.modernScoreCardEl.classList.add('hidden');
+      this.modernCenterStatusEl.classList.add('hidden');
+      this.modernTargetsCardEl.classList.add('hidden');
+      this.peekControllerEl.classList.add('hidden');
+      this.weaponDockEl.classList.add('hidden');
+      this.virtualJoystick.setVisible(false);
+      this.indicatorManager.clear();
+      this.crosshairEl.classList.remove('locked', 'friendly-warning', 'blocked');
+      this.lockHintEl.classList.add('hidden');
+      this.friendlyBadgeEl.classList.add('hidden');
+      this.blockedBadgeEl.classList.add('hidden');
+
+      // 3. 激活复古 NES HUD
+      this.nesHudEl.classList.remove('hidden');
+
+      // 4. 启动打鸭子引擎
+      this.duckHuntEngine.start(cfg.duckHuntSubmode!);
+      this.showStatusNotification(`进入【${cfg.shortName}】`);
+    } else {
+      // 1. 彻底清空打鸭子舞台
+      this.duckHuntEngine.clear();
+      this.nesHudEl.classList.add('hidden');
+      this.flyAwayBannerEl.classList.add('hidden');
+
+      // 2. 恢复 360 度沙盒 HUD 与控制部件
+      this.modernScoreCardEl.classList.remove('hidden');
+      this.modernCenterStatusEl.classList.remove('hidden');
+      this.modernTargetsCardEl.classList.remove('hidden');
+      this.peekControllerEl.classList.remove('hidden');
+      this.weaponDockEl.classList.remove('hidden');
+      this.virtualJoystick.setVisible(true);
+
+      // 3. 构建 360 度对应生态
+      this.applyCurrentModeContent(mode);
+    }
+  }
+
+  private applyCurrentModeContent(mode: GameMode): void {
+    this.entityManager.setMode(mode);
+    if (mode === 'hunting') {
+      this.environmentManager.initHuntingEnvironment();
+      this.entityManager.initHuntingEcosystem();
+      this.cockpitManager.setVisible(false);
+      this.weaponManager.setVisible(true);
+    } else if (mode === 'scifi') {
+      this.environmentManager.initSciFiEnvironment();
+      this.entityManager.initSciFiEcosystem();
+      this.cockpitManager.setVisible(true);
+      this.weaponManager.setVisible(false);
+    } else if (mode === 'ghost') {
+      this.environmentManager.initHalloweenEnvironment();
+      this.entityManager.initGhostEcosystem();
+      this.cockpitManager.setVisible(false);
+      this.weaponManager.setVisible(true);
+    }
+    this.updateTargetCountUI();
+  }
+
+  // ==========================================================================
+  // NES 打鸭子 HUD 同步与结算回调
+  // ==========================================================================
+
+  private updateNesHUD(state: DuckHuntHUDState): void {
+    // 1. R = X
+    this.nesRoundValEl.textContent = state.round.toString();
+
+    // 2. SHOT 3 颗子弹
+    const bullets = this.nesShotIconsEl.querySelectorAll('.nes-bullet');
+    bullets.forEach((b, idx) => {
+      if (idx < state.shotsLeft) {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
+
+    // 3. HIT 10 个格子
+    this.nesHitSlotsEl.innerHTML = '';
+    state.targetResults.forEach((res) => {
+      const slot = document.createElement('div');
+      slot.className = `nes-target-slot ${res}`;
+      this.nesHitSlotsEl.appendChild(slot);
+    });
+
+    // Pass Line 刻度线位置
+    this.nesPassMarkerEl.style.left = `${(state.passLine / 10) * 100}%`;
+
+    // 4. SCORE 6 位数字
+    this.nesScoreValEl.textContent = state.currentScore.toString().padStart(6, '0');
+
+    // 5. FLY AWAY 警报横幅
+    if (state.isFlyAway) {
+      this.flyAwayBannerEl.classList.remove('hidden');
+    } else {
+      this.flyAwayBannerEl.classList.add('hidden');
+    }
+
+    // 实时更新最高分
+    this.modeManager.updateHighScore(this.modeManager.getMode(), state.currentScore);
+  }
+
+  private handleDuckHuntGameOver(finalScore: number, roundReached: number): void {
+    this.modeManager.updateHighScore(this.modeManager.getMode(), finalScore);
+    const bestScore = this.modeManager.getHighScore(this.modeManager.getMode());
+
+    this.nesModalTitleEl.textContent = 'GAME OVER';
+    this.nesFinalScoreEl.textContent = finalScore.toString().padStart(6, '0');
+    this.nesFinalRoundEl.textContent = roundReached.toString();
+    this.nesFinalBestEl.textContent = bestScore.toString().padStart(6, '0');
+    this.nesGameoverModalEl.classList.remove('hidden');
+  }
+
+  private handleDuckHuntRoundClear(round: number, bonus: number): void {
+    this.showHitPopup(`ROUND ${round} PERFECT!! +${bonus}`, false, 'duck-perfect-popup');
+  }
+
+  // ==========================================================================
+  // 开火射击逻辑
+  // ==========================================================================
+
+  private triggerFire(): void {
+    if (!this.isGameRunning) return;
+
+    const cfg = this.modeManager.getModeConfig();
+    const activeCam = this.getActiveCamera();
+    activeCam.getWorldPosition(this.tempCamPos);
+
+    if (cfg.isRetroLightGun) {
+      // 1. 光线枪 CRT 50ms 白屏瞬间闪烁
+      this.crtFlashEl.classList.remove('hidden');
+      setTimeout(() => this.crtFlashEl.classList.add('hidden'), 50);
+
+      if (navigator.vibrate) navigator.vibrate(40);
+
+      // 2. 射向打鸭子引擎
+      this.raycaster.setFromCamera(this.centerNdc, activeCam);
+      this.duckHuntEngine.shoot(this.raycaster);
+      return;
+    }
+
+    // 360 沙盒多武器射击逻辑
+    if (!this.weaponManager.canFire()) return;
+
+    const currentWeapon = this.weaponManager.getCurrentConfig();
+
+    if (currentWeapon.type === 'rifle') {
+      this.audioManager.playRifleShot();
+      if (navigator.vibrate) navigator.vibrate([25, 20, 35]);
+    } else if (currentWeapon.type === 'shotgun') {
+      this.audioManager.playShotgunShot();
+      if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
+    } else {
+      this.audioManager.playSniperShot();
+      if (navigator.vibrate) navigator.vibrate([35, 25, 45]);
+    }
+
+    const pellets = currentWeapon.pellets;
+    const spread = currentWeapon.spread;
+
+    for (let p = 0; p < pellets; p++) {
+      const spreadX = (Math.random() - 0.5) * spread;
+      const spreadY = (Math.random() - 0.5) * spread;
+      const pelletNdc = new THREE.Vector2(spreadX, spreadY);
+
+      this.raycaster.setFromCamera(pelletNdc, activeCam);
+
+      const obsHit = this.environmentManager.checkObstacleIntersection(this.raycaster);
+      const entHit = this.entityManager.checkRayIntersection(this.raycaster);
+
+      let endPoint: THREE.Vector3;
+      let bulletBlocked = false;
+
+      if (obsHit && !currentWeapon.penetratesCover) {
+        if (!entHit) {
+          bulletBlocked = true;
+        } else {
+          const distToEntity = this.tempCamPos.distanceTo(entHit.position);
+          if (obsHit.distance < distToEntity) {
+            bulletBlocked = true;
+          }
+        }
+      }
+
+      if (obsHit && obsHit.obstacle && currentWeapon.penetratesCover) {
+        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, currentWeapon.obstacleDamage, obsHit.point);
+        if (obsRes.destroyed) {
+          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
+          this.showHitPopup(`💥 穿甲贯穿！${obsRes.name}被轰碎`, false, 'blocked-hint');
+        }
+      }
+
+      if (bulletBlocked && obsHit && obsHit.obstacle) {
+        endPoint = obsHit.point;
+        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, currentWeapon.obstacleDamage, obsHit.point);
+
+        if (obsRes.destroyed) {
+          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
+          this.showHitPopup(`💥 ${obsRes.name}崩塌碎裂！`, false, 'blocked-hint');
+        } else {
+          this.audioManager.playObstacleHit();
+          this.showHitPopup(`🛡️ ${obsRes.name}耐久 [${obsRes.remainingHealth}/${obsRes.obstacle.maxHealth}]`, false, 'blocked-hint');
+        }
+      } else if (entHit) {
+        endPoint = entHit.position.clone();
+        const hitRes = this.entityManager.hitEntity(entHit, currentWeapon.damage, entHit.position);
+
+        if (hitRes.isFriendly) {
+          this.score = Math.max(0, this.score + hitRes.scoreChange);
+          this.scoreValEl.textContent = this.score.toString();
+          this.audioManager.playFriendlyHurt();
+          this.triggerFriendlyWarningFlash();
+          this.showHitPopup(`${hitRes.scoreChange} 误伤${hitRes.name}！`, true, 'friendly-penalty');
+        } else {
+          this.score += hitRes.scoreChange;
+          this.scoreValEl.textContent = this.score.toString();
+          this.modeManager.updateHighScore(this.modeManager.getMode(), this.score);
+          this.audioManager.playTargetHit(hitRes.killed || false);
+          this.showHitPopup(`+${hitRes.scoreChange} ${hitRes.name}`, false);
+        }
+      } else {
+        endPoint = this.tempCamPos.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(22));
+      }
+
+      const beamColor = currentWeapon.type === 'sniper' ? 0x22d3ee : currentWeapon.type === 'shotgun' ? 0xf59e0b : 0x00f3ff;
+      this.createLaserBeam(this.tempCamPos, endPoint, beamColor);
+    }
+
+    this.updateTargetCountUI();
+  }
+
+  // ==========================================================================
+  // 辅助与回调
+  // ==========================================================================
+
   private onWeaponSwitched(cfg: WeaponConfig): void {
-    // 1. 更新 HUD 按钮高亮
     this.weaponBtnEls.forEach((btn) => {
       if (btn.dataset.weapon === cfg.type) {
         btn.classList.add('active');
@@ -362,11 +747,9 @@ class ArShooterGame {
       }
     });
 
-    // 2. 播放机械上膛音效
     this.audioManager.playWeaponSwitch();
     this.showStatusNotification(`已装备: ${cfg.name}`);
 
-    // 3. 狙击枪光学 2X 变焦机制
     if (cfg.type === 'sniper') {
       this.camera.fov = 70 / 2.0;
       this.camera.updateProjectionMatrix();
@@ -381,42 +764,6 @@ class ArShooterGame {
     }
   }
 
-  /**
-   * 当切换玩法模式时回调
-   */
-  private onModeSwitched(mode: GameMode): void {
-    const cfg = this.modeManager.getModeConfig(mode);
-    this.gameModeIconEl.textContent = cfg.icon;
-    this.gameModeTextEl.textContent = cfg.name;
-    this.showStatusNotification(`进入【${cfg.name}】模式`);
-
-    this.applyCurrentModeContent(mode);
-  }
-
-  private applyCurrentModeContent(mode: GameMode): void {
-    this.entityManager.setMode(mode);
-    if (mode === 'hunting') {
-      this.environmentManager.initHuntingEnvironment();
-      this.entityManager.initHuntingEcosystem();
-      this.cockpitManager.setVisible(false);
-      this.weaponManager.setVisible(true);
-    } else if (mode === 'scifi') {
-      this.environmentManager.initSciFiEnvironment();
-      this.entityManager.initSciFiEcosystem();
-      this.cockpitManager.setVisible(true);
-      this.weaponManager.setVisible(false); // 星际模式下由战机外置双主炮开火
-    } else if (mode === 'ghost') {
-      this.environmentManager.initHalloweenEnvironment();
-      this.entityManager.initGhostEcosystem();
-      this.cockpitManager.setVisible(false);
-      this.weaponManager.setVisible(true);
-    }
-    this.updateTargetCountUI();
-  }
-
-  /**
-   * 玩家飞船遭受敌方战机等离子光弹击中
-   */
   private handlePlayerHitByEnemy(): void {
     if (this.modeManager.getMode() === 'scifi') {
       this.cockpitManager.triggerShieldHit();
@@ -446,7 +793,10 @@ class ArShooterGame {
     } else {
       this.modePillIconEl.textContent = '🕹️';
       this.modePillTextEl.textContent = '摇杆推进';
-      this.virtualJoystick.setVisible(true);
+      const cfg = this.modeManager.getModeConfig();
+      if (!cfg.isRetroLightGun) {
+        this.virtualJoystick.setVisible(true);
+      }
       this.sensorModeEl.textContent = '6DoF HYBRID';
       this.sensorModeEl.style.color = '#00f3ff';
     }
@@ -471,6 +821,9 @@ class ArShooterGame {
     this.isGameRunning = true;
     this.updateModeUI();
     this.audioManager.playLockSound();
+
+    // 授权成功后，直接打开二级游戏大厅让玩家选择玩法！
+    this.openGameHub();
   }
 
   private handleSensorModeChange(mode: SensorMode): void {
@@ -486,120 +839,6 @@ class ArShooterGame {
     }
   }
 
-  /**
-   * 触发射击：多武器散射、掩体物理遮挡与击中/误伤处理
-   */
-  private triggerFire(): void {
-    if (!this.isGameRunning) return;
-
-    // 检查武器冷却
-    if (!this.weaponManager.canFire()) return;
-
-    const activeCam = this.getActiveCamera();
-    activeCam.getWorldPosition(this.tempCamPos);
-    const cfg = this.weaponManager.getCurrentConfig();
-
-    // 武器音效与触觉反馈
-    if (cfg.type === 'rifle') {
-      this.audioManager.playRifleShot();
-      if (navigator.vibrate) navigator.vibrate([25, 20, 35]);
-    } else if (cfg.type === 'shotgun') {
-      this.audioManager.playShotgunShot();
-      if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
-    } else {
-      this.audioManager.playSniperShot();
-      if (navigator.vibrate) navigator.vibrate([35, 25, 45]);
-    }
-
-    // 遍历当前武器弹丸 (霰弹枪为 8 颗，步枪/狙击为 1 发)
-    const pellets = cfg.pellets;
-    const spread = cfg.spread;
-
-    for (let p = 0; p < pellets; p++) {
-      const spreadX = (Math.random() - 0.5) * spread;
-      const spreadY = (Math.random() - 0.5) * spread;
-      const pelletNdc = new THREE.Vector2(spreadX, spreadY);
-
-      this.raycaster.setFromCamera(pelletNdc, activeCam);
-
-      // 1. 掩体物理遮挡检测
-      const obsHit = this.environmentManager.checkObstacleIntersection(this.raycaster);
-      // 2. 动物实体检测
-      const entHit = this.entityManager.checkRayIntersection(this.raycaster);
-
-      let endPoint: THREE.Vector3;
-      let bulletBlocked = false;
-
-      // 判定逻辑：若击中掩体且掩体比猎物更近，并且当前武器不具备穿甲属性，则子弹被拦截！
-      if (obsHit && !cfg.penetratesCover) {
-        if (!entHit) {
-          bulletBlocked = true;
-        } else {
-          const distToEntity = this.tempCamPos.distanceTo(entHit.position);
-          if (obsHit.distance < distToEntity) {
-            bulletBlocked = true;
-          }
-        }
-      }
-
-      // 如果是穿甲狙击枪击中掩体，狙击弹穿透掩体的同时对掩体造成重创甚至直接打碎！
-      if (obsHit && obsHit.obstacle && cfg.penetratesCover) {
-        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, cfg.obstacleDamage, obsHit.point);
-        if (obsRes.destroyed) {
-          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
-          this.showHitPopup(`💥 穿甲贯穿！${obsRes.name}被轰碎`, false, 'blocked-hint');
-        }
-      }
-
-      if (bulletBlocked && obsHit && obsHit.obstacle) {
-        // 掩体格挡！扣除掩体耐久并判断是否崩碎
-        endPoint = obsHit.point;
-        const obsRes = this.environmentManager.hitObstacle(obsHit.obstacle, cfg.obstacleDamage, obsHit.point);
-
-        if (obsRes.destroyed) {
-          // 掩体耐久归零彻底碎裂！
-          this.audioManager.playObstacleDestroyed(obsRes.obstacle.type);
-          this.showHitPopup(`💥 ${obsRes.name}崩塌碎裂！`, false, 'blocked-hint');
-        } else {
-          // 未彻底碎裂：播放格挡音并显示剩余耐久
-          this.audioManager.playObstacleHit();
-          this.showHitPopup(`🛡️ ${obsRes.name}耐久 [${obsRes.remainingHealth}/${obsRes.obstacle.maxHealth}]`, false, 'blocked-hint');
-        }
-      } else if (entHit) {
-        // 击中实体 (目标猎物 或 友善动物)
-        endPoint = entHit.position.clone();
-        const hitRes = this.entityManager.hitEntity(entHit, cfg.damage, entHit.position);
-
-        if (hitRes.isFriendly) {
-          // 误伤禁射目标！屏幕泛红警报、大额扣分与哀鸣
-          this.score = Math.max(0, this.score + hitRes.scoreChange);
-          this.scoreValEl.textContent = this.score.toString();
-          this.audioManager.playFriendlyHurt();
-          this.triggerFriendlyWarningFlash();
-          this.showHitPopup(`${hitRes.scoreChange} 误伤${hitRes.name}！`, true, 'friendly-penalty');
-        } else {
-          // 命中猎物目标！
-          this.score += hitRes.scoreChange;
-          this.scoreValEl.textContent = this.score.toString();
-          this.audioManager.playTargetHit(hitRes.killed || false);
-          this.showHitPopup(`+${hitRes.scoreChange} ${hitRes.name}`, false);
-        }
-      } else {
-        // 未中目标，射向远空
-        endPoint = this.tempCamPos.clone().add(this.raycaster.ray.direction.clone().multiplyScalar(22));
-      }
-
-      // 创建激光弹道
-      const beamColor = cfg.type === 'sniper' ? 0x22d3ee : cfg.type === 'shotgun' ? 0xf59e0b : 0x00f3ff;
-      this.createLaserBeam(this.tempCamPos, endPoint, beamColor);
-    }
-
-    this.updateTargetCountUI();
-  }
-
-  /**
-   * 触发误伤刺眼全屏泛光
-   */
   private triggerFriendlyWarningFlash(): void {
     this.friendlyFlashEl.classList.remove('hidden');
     setTimeout(() => {
@@ -607,23 +846,16 @@ class ArShooterGame {
     }, 450);
   }
 
-  /**
-   * 浮动飘字特效
-   */
   private showHitPopup(text: string, isDanger: boolean = false, customClass?: string): void {
     const floatText = document.createElement('div');
     floatText.className = `hit-float-text ${customClass || ''}`;
     floatText.textContent = text;
-    if (isDanger) {
-      floatText.style.color = '#ef4444';
-    }
+    if (isDanger) floatText.style.color = '#ef4444';
     floatText.style.left = `${window.innerWidth / 2}px`;
     floatText.style.top = `${window.innerHeight / 2 - 40}px`;
     this.hitFeedbackContainer.appendChild(floatText);
 
-    setTimeout(() => {
-      floatText.remove();
-    }, 850);
+    setTimeout(() => floatText.remove(), 850);
   }
 
   private createLaserBeam(start: THREE.Vector3, end: THREE.Vector3, colorHex: number = 0x00f3ff): void {
@@ -673,21 +905,28 @@ class ArShooterGame {
     }
   }
 
-  /**
-   * 智能准星分类识别与遮挡预警检测 (每帧运行)
-   */
   private updateSmartReticle(): void {
     if (!this.isGameRunning) return;
+
+    const cfg = this.modeManager.getModeConfig();
+    if (cfg.isRetroLightGun) {
+      // 打鸭子模式下准星保持常态
+      this.crosshairEl.classList.remove('locked', 'friendly-warning', 'blocked');
+      this.lockHintEl.classList.add('hidden');
+      this.friendlyBadgeEl.classList.add('hidden');
+      this.blockedBadgeEl.classList.add('hidden');
+      return;
+    }
 
     const activeCam = this.getActiveCamera();
     this.raycaster.setFromCamera(this.centerNdc, activeCam);
 
     const obsHit = this.environmentManager.checkObstacleIntersection(this.raycaster);
     const entHit = this.entityManager.checkRayIntersection(this.raycaster);
-    const cfg = this.weaponManager.getCurrentConfig();
+    const weaponCfg = this.weaponManager.getCurrentConfig();
 
     let isCoverBlocking = false;
-    if (obsHit && !cfg.penetratesCover) {
+    if (obsHit && !weaponCfg.penetratesCover) {
       if (!entHit) {
         isCoverBlocking = true;
       } else {
@@ -700,7 +939,6 @@ class ArShooterGame {
     }
 
     if (isCoverBlocking) {
-      // 准星被岩石或树木遮挡
       this.crosshairEl.classList.add('blocked');
       this.crosshairEl.classList.remove('locked', 'friendly-warning');
       this.blockedBadgeEl.classList.remove('hidden');
@@ -715,14 +953,12 @@ class ArShooterGame {
 
     if (entHit) {
       if (entHit.isFriendly) {
-        // 准星对准友军禁射目标 (黄绿警告态 + ⚠️ 友军禁射)
         this.crosshairEl.classList.add('friendly-warning');
         this.crosshairEl.classList.remove('locked');
         this.friendlyBadgeEl.classList.remove('hidden');
         this.lockHintEl.classList.add('hidden');
         this.scopeTargetTextEl.textContent = 'WARNING: FRIENDLY TARGET';
       } else {
-        // 准星锁定目标猎物 (红色放大态 + LOCKED)
         this.crosshairEl.classList.add('locked');
         this.crosshairEl.classList.remove('friendly-warning');
         this.lockHintEl.classList.remove('hidden');
@@ -735,7 +971,6 @@ class ArShooterGame {
         }
       }
     } else {
-      // 准星无目标
       this.crosshairEl.classList.remove('locked', 'friendly-warning');
       this.lockHintEl.classList.add('hidden');
       this.friendlyBadgeEl.classList.add('hidden');
@@ -775,54 +1010,47 @@ class ArShooterGame {
   private animate(): void {
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const activeCam = this.getActiveCamera();
+    const cfg = this.modeManager.getModeConfig();
 
     // 1. 传感器姿态更新
     if (!this.webxrManager.getIsActive()) {
       this.gyroController.update(delta);
     }
 
-    // 2. 歪头探身机制 (Roll-to-Peek & Slider)
-    // 结合陀螺仪横滚角与 UI 滑块进行视差偏移
-    const rollAngle = this.gyroController.getRollAngle();
-    // 横滚角度映射至 [-1.8m, +1.8m]
-    const rollPeek = Math.max(-1.8, Math.min(1.8, (rollAngle / 25) * 1.8));
-    const combinedPeek = Math.max(-2.2, Math.min(2.2, this.sliderPeekOffset + rollPeek));
-    this.environmentManager.setPeekOffset(combinedPeek);
-    this.environmentManager.update(delta, this.camera);
-    this.peekValTextEl.textContent = `${this.environmentManager.getPeekOffset().toFixed(1)}m`;
+    if (cfg.isRetroLightGun) {
+      // 处于 FC 打鸭子模式：禁用歪头探身与摇杆推进
+      this.duckHuntEngine.update(delta);
+    } else {
+      // 处于 360° AR 沙盒模式
+      const rollAngle = this.gyroController.getRollAngle();
+      const rollPeek = Math.max(-1.8, Math.min(1.8, (rollAngle / 25) * 1.8));
+      const combinedPeek = Math.max(-2.2, Math.min(2.2, this.sliderPeekOffset + rollPeek));
+      this.environmentManager.setPeekOffset(combinedPeek);
+      this.environmentManager.update(delta, this.camera);
+      this.peekValTextEl.textContent = `${this.environmentManager.getPeekOffset().toFixed(1)}m`;
 
-    // 3. 虚拟摇杆空间位移推进
-    if (this.virtualJoystick.getIsVisible() && this.isGameRunning) {
-      this.virtualJoystick.applyMovement(this.playerRig, activeCam, delta, 4.0);
+      if (this.virtualJoystick.getIsVisible() && this.isGameRunning) {
+        this.virtualJoystick.applyMovement(this.playerRig, activeCam, delta, 4.0);
+      }
+
+      this.scene.updateMatrixWorld(true);
+
+      this.entityManager.update(delta, activeCam);
+      this.weaponManager.update(delta);
+      this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector());
+      this.updateLasers(delta);
+      this.updateSmartReticle();
+
+      if (this.isGameRunning) {
+        const activeTargets = this.entityManager.getActiveTargets().map((e) => ({
+          id: e.id,
+          isDying: e.isDying,
+          currentPosition: e.position,
+        }));
+        this.indicatorManager.update(activeCam, activeTargets);
+      }
     }
 
-    // 强制同步世界矩阵
-    this.scene.updateMatrixWorld(true);
-
-    // 4. 生态实体 AI 移动与更新
-    this.entityManager.update(delta, activeCam);
-
-    // 5. 3D 枪模呼吸摆动与后坐力回弹 / 战机座舱姿态
-    this.weaponManager.update(delta);
-    this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector());
-
-    // 6. 激光弹道生命期
-    this.updateLasers(delta);
-
-    // 7. 智能准星分类识别
-    this.updateSmartReticle();
-
-    // 8. 屏外边缘指示箭头 (仅针对敌对猎物目标，友善动物不显箭头)
-    if (this.isGameRunning) {
-      const activeTargets = this.entityManager.getActiveTargets().map((e) => ({
-        id: e.id,
-        isDying: e.isDying,
-        currentPosition: e.position,
-      }));
-      this.indicatorManager.update(activeCam, activeTargets);
-    }
-
-    // 9. 画面透明渲染
     this.renderer.render(this.scene, this.camera);
   }
 }

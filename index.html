@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0e17" />
-    <title>AR 空间射手 - Web 3DoF/6DoF AR Shooter</title>
+    <title>AR 空间射手 - Web 3DoF/6DoF AR Shooter & Duck Hunt 1984</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -48,15 +48,20 @@
     <div id="hud">
       <!-- 顶部信息栏 -->
       <header id="top-bar">
-        <div class="hud-card score-card">
+        <button id="hub-btn" class="hud-mode-pill hub-entry-pill" title="打开游戏大厅选择模式">
+          <span class="hub-pill-icon">🏠</span>
+          <span class="hub-pill-text">大厅</span>
+        </button>
+
+        <div class="hud-card score-card" id="modern-score-card">
           <span class="label">SCORE</span>
           <span id="score-val" class="value">0</span>
         </div>
 
-        <div class="hud-center-status">
+        <div class="hud-center-status" id="modern-center-status">
           <span id="status-badge" class="badge">RADAR ACTIVE</span>
           <div class="mode-tags-row">
-            <button id="game-mode-btn" class="hud-mode-pill mode-highlight" title="点击切换玩法模式 (荒野狩猎 / 星际防卫 / 幽灵猎手)">
+            <button id="game-mode-btn" class="hud-mode-pill mode-highlight" title="点击切换玩法模式">
               <span id="game-mode-icon">🌲</span>
               <span id="game-mode-text">荒野狩猎</span>
             </button>
@@ -68,13 +73,13 @@
           </div>
         </div>
 
-        <div class="hud-card targets-card">
+        <div class="hud-card targets-card" id="modern-targets-card">
           <span class="label">TARGETS</span>
           <span id="targets-val" class="value">0</span>
         </div>
       </header>
 
-      <!-- 屏外怪物边缘指示器挂载容器 -->
+      <!-- 屏外怪物边缘指示器挂载容器 (360度模式独占) -->
       <div id="indicator-container"></div>
 
       <!-- 屏幕正中央智能准星 Crosshair -->
@@ -100,7 +105,10 @@
       <!-- 浮动伤害/击杀得分与误伤提示容器 -->
       <div id="hit-feedback-container"></div>
 
-      <!-- 中间操作交互区 (左右两侧) -->
+      <!-- 逃脱警报条 (Duck Hunt FLY AWAY!) -->
+      <div id="fly-away-banner" class="fly-away-banner hidden">FLY AWAY!</div>
+
+      <!-- 中间操作交互区 (左右两侧，360度模式独占) -->
       <div id="hud-mid-row">
         <!-- 左侧：歪头探身控制器 (Peek Control) -->
         <div id="peek-controller">
@@ -147,6 +155,35 @@
         </div>
       </div>
 
+      <!-- NES 复古红白机专属像素 HUD (打鸭子模式专用) -->
+      <div id="nes-hud" class="nes-hud hidden">
+        <div class="nes-hud-section nes-round-box">
+          <span class="nes-label green">R =</span>
+          <span id="nes-round-val" class="nes-val green">1</span>
+        </div>
+        <div class="nes-hud-section nes-shot-box">
+          <div class="nes-shot-icons" id="nes-shot-icons">
+            <div class="nes-bullet active"></div>
+            <div class="nes-bullet active"></div>
+            <div class="nes-bullet active"></div>
+          </div>
+          <span class="nes-label blue">SHOT</span>
+        </div>
+        <div class="nes-hud-section nes-hit-box">
+          <div class="nes-hit-slots" id="nes-hit-slots">
+            <!-- 10 个命中指示格子 -->
+          </div>
+          <div class="nes-pass-bar">
+            <span class="nes-label blue">HIT</span>
+            <div class="nes-pass-indicator" id="nes-pass-marker" title="合格线"></div>
+          </div>
+        </div>
+        <div class="nes-hud-section nes-score-box">
+          <span class="nes-label white">SCORE</span>
+          <span id="nes-score-val" class="nes-val white">000000</span>
+        </div>
+      </div>
+
       <!-- 底部控制栏 -->
       <footer id="bottom-bar">
         <button id="recalibrate-btn" class="hud-btn secondary-btn" title="重新对齐当前视角为正前方">
@@ -182,10 +219,145 @@
       </footer>
     </div>
 
+    <!-- 光线枪 CRT 50ms 白屏瞬间闪烁层 -->
+    <div id="crt-flash-overlay" class="crt-flash-overlay hidden"></div>
+
     <!-- 友军误伤警报全屏泛光层 -->
     <div id="friendly-flash-overlay" class="friendly-flash-overlay hidden"></div>
 
-    <!-- 启动遮罩弹窗 (用于同步触发 iOS 陀螺仪与摄像头权限) -->
+    <!-- 二级游戏大厅模态弹窗 (Game Hub) -->
+    <div id="game-hub-modal" class="modal-overlay hidden">
+      <div class="modal-card hub-modal-card">
+        <div class="hub-header">
+          <div class="hub-title-box">
+            <span class="hub-badge">AR ARCADE</span>
+            <h2 class="hub-title">AR 射击游戏中心</h2>
+            <p class="hub-subtitle">全景空间沙盒 · 复古光枪街机 · 陀螺仪实景交互</p>
+          </div>
+          <button id="hub-close-btn" class="hub-close-btn" title="关闭大厅继续游戏">✕</button>
+        </div>
+
+        <div class="hub-scroll-body">
+          <!-- 板块一：360° 全景射击体验 -->
+          <section class="hub-category-section">
+            <div class="category-header">
+              <span class="category-icon">🌐</span>
+              <div class="category-title-box">
+                <h3 class="category-title">全景射击体验 (360° AR Sandbox)</h3>
+                <p class="category-desc">360° 环绕空间 · 自由换枪 · 体感歪头探身 · 真实空间走位</p>
+              </div>
+            </div>
+
+            <div class="hub-cards-grid">
+              <!-- 荒野狩猎 -->
+              <div class="hub-card" data-mode="hunting">
+                <div class="hub-card-top">
+                  <span class="card-icon">🌲</span>
+                  <span class="card-badge">360° 生态</span>
+                  <span class="card-hi">HI: <strong id="hub-hi-hunting">0</strong></span>
+                </div>
+                <h4 class="card-title">荒野狩猎 (Wilderness Hunt)</h4>
+                <p class="card-desc">虚拟溪流、树木巨石掩体、猎鹿熊野猪与牛羊猎犬防误伤</p>
+                <button class="hub-launch-btn" data-mode="hunting">进入体验</button>
+              </div>
+
+              <!-- 星际防卫 -->
+              <div class="hub-card" data-mode="scifi">
+                <div class="hub-card-top">
+                  <span class="card-icon">🚀</span>
+                  <span class="card-badge">战机座舱</span>
+                  <span class="card-hi">HI: <strong id="hub-hi-scifi">0</strong></span>
+                </div>
+                <h4 class="card-title">星际防卫 (Sci-Fi Invasion)</h4>
+                <p class="card-desc">360°深空战机、虚拟座舱机动、曲率光速粒子雨与规避弹幕</p>
+                <button class="hub-launch-btn" data-mode="scifi">进入体验</button>
+              </div>
+
+              <!-- 幽灵猎手 -->
+              <div class="hub-card" data-mode="ghost">
+                <div class="hub-card-top">
+                  <span class="card-icon">🎃</span>
+                  <span class="card-badge">万圣幽冥</span>
+                  <span class="card-hi">HI: <strong id="hub-hi-ghost">0</strong></span>
+                </div>
+                <h4 class="card-title">幽灵猎手 (Ghost Buster)</h4>
+                <p class="card-desc">360°万圣墓园、飞蝠走尸南瓜怪、12°手电筒光锥探照显形</p>
+                <button class="hub-launch-btn" data-mode="ghost">进入体验</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 板块二：复古光枪街机厅 -->
+          <section class="hub-category-section retro-section">
+            <div class="category-header">
+              <span class="category-icon">🕹️</span>
+              <div class="category-title-box">
+                <h3 class="category-title">复古光枪街机厅 (Retro Light-Gun Classics)</h3>
+                <p class="category-desc">固定正前方舞台 · 禁用摇杆与换枪 · 1:1 还原红白机算分规则</p>
+              </div>
+            </div>
+
+            <div class="retro-hunt-card">
+              <div class="retro-card-banner">
+                <div class="retro-banner-left">
+                  <span class="retro-banner-icon">🦆</span>
+                  <div>
+                    <h4 class="retro-banner-title">FC 经典打鸭子 (Duck Hunt 1984)</h4>
+                    <p class="retro-banner-desc">正前方草丛遮挡 · 3发子弹硬核限制 · 5.5秒逃脱与猎犬魔性嘲笑</p>
+                  </div>
+                </div>
+                <div class="retro-hi-box">
+                  <span class="hi-label">BEST SCORE</span>
+                  <span id="hub-hi-duckhunt" class="hi-val">000000</span>
+                </div>
+              </div>
+
+              <div class="duck-submodes-row">
+                <button class="duck-submode-btn btn-game-a" data-mode="duckhunt_a">
+                  <span class="submode-title">[GAME A: 单鸭模式]</span>
+                  <span class="submode-detail">每波 1 鸭出击 · 适合精准射击</span>
+                </button>
+                <button class="duck-submode-btn btn-game-b" data-mode="duckhunt_b">
+                  <span class="submode-title">[GAME B: 双鸭模式]</span>
+                  <span class="submode-detail">双鸭同时腾空 · 考验双发跟枪</span>
+                </button>
+                <button class="duck-submode-btn btn-game-c" data-mode="duckhunt_c">
+                  <span class="submode-title">[GAME C: 飞盘射击]</span>
+                  <span class="submode-detail">双向抛物线急速远去 · 极限预判</span>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- NES 打鸭子 GAME OVER / 结算弹窗 -->
+    <div id="nes-gameover-modal" class="modal-overlay hidden">
+      <div class="modal-card nes-modal-card">
+        <h2 id="nes-modal-title" class="nes-pixel-title">GAME OVER</h2>
+        <div class="nes-stats-row">
+          <div class="nes-stat-item">
+            <span class="nes-stat-label">FINAL SCORE</span>
+            <span id="nes-final-score" class="nes-stat-val">000000</span>
+          </div>
+          <div class="nes-stat-item">
+            <span class="nes-stat-label">ROUND REACHED</span>
+            <span id="nes-final-round" class="nes-stat-val">1</span>
+          </div>
+          <div class="nes-stat-item">
+            <span class="nes-stat-label">HIGH SCORE</span>
+            <span id="nes-final-best" class="nes-stat-val">000000</span>
+          </div>
+        </div>
+        <div class="nes-modal-actions">
+          <button id="nes-retry-btn" class="nes-btn nes-retry-btn">重玩本模式</button>
+          <button id="nes-hub-return-btn" class="nes-btn nes-hub-btn">返回游戏大厅</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 首次启动授权页 (同步触发 iOS 陀螺仪与摄像头权限) -->
     <div id="start-modal" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-glow"></div>
@@ -194,7 +366,7 @@
             <span class="logo-ar">AR</span>
             <span class="logo-sub">VOID STRIKER</span>
           </div>
-          <p class="modal-subtitle">Web 跨平台 3DoF/6DoF 空间现实射击</p>
+          <p class="modal-subtitle">Web 跨平台 3DoF/6DoF 空间现实射击中心</p>
         </div>
 
         <div class="feature-tags">
@@ -205,20 +377,20 @@
             <span class="tag-dot"></span> 6DoF 自由走位推进
           </div>
           <div class="tag-item">
-            <span class="tag-dot"></span> 屏外 3D 边缘雷达
+            <span class="tag-dot"></span> FC 经典打鸭子 1:1 复刻
           </div>
         </div>
 
         <div class="instructions-box">
-          <p>🎯 <strong>瞄准与射击</strong>：转动手机瞄准空间中的怪物，准星锁定变红后点击 <strong>FIRE</strong> 开火。</p>
-          <p>🕹️ <strong>走动靠近怪物 (近大远小)</strong>：左手拇指推左下角<strong>虚拟摇杆</strong>（或PC键盘 WASD）可自由前后走动靠近/远离怪物！顶部支持一键切换 WebXR 真实物理空间行走。</p>
+          <p>🎯 <strong>瞄准与射击</strong>：转动手机瞄准空间中的目标，点击 <strong>FIRE</strong> 或屏幕开火。</p>
+          <p>🏠 <strong>游戏大厅中心</strong>：授权后进入大厅，随时畅玩【360° 全景射击】与【FC 1984 打鸭子】！</p>
         </div>
 
         <div id="permission-error-hint" class="error-hint hidden"></div>
 
         <button id="start-btn" class="start-btn">
           <span class="btn-glow-bar"></span>
-          <span class="btn-text">开启 AR 射击作战</span>
+          <span class="btn-text">开启 AR 引擎 & 进入大厅</span>
           <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="5" y1="12" x2="19" y2="12"></line>
             <polyline points="12 5 19 12 12 19"></polyline>
