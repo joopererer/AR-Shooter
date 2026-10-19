@@ -1285,61 +1285,101 @@ body {
 .hub-category-section {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: 12px;
+  padding: 10px 12px;
   text-align: left;
 }
 
 .hub-category-section.retro-section {
-  background: linear-gradient(145deg, rgba(22, 101, 52, 0.15), rgba(15, 23, 42, 0.3));
+  background: linear-gradient(145deg, rgba(22, 101, 52, 0.16), rgba(15, 23, 42, 0.35));
   border: 1px solid rgba(34, 197, 94, 0.35);
 }
 
 .category-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .category-icon {
-  font-size: 24px;
+  font-size: 20px;
+}
+
+.category-title-box {
+  flex: 1;
+}
+
+.category-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .category-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #f1f5f9;
 }
 
+.carousel-hint {
+  font-size: 10px;
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  animation: hint-pulse 1.6s infinite ease-in-out;
+}
+
+.carousel-hint.retro-hint {
+  color: #4ade80;
+}
+
+@keyframes hint-pulse {
+  0%, 100% { opacity: 0.6; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(3px); }
+}
+
 .category-desc {
-  margin: 2px 0 0 0;
-  font-size: 11px;
+  margin: 1px 0 0 0;
+  font-size: 10.5px;
   color: #94a3b8;
 }
 
-.hub-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+/* 横向滑动卡片轨道 (Horizontal Carousel Track) */
+.hub-carousel-track {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 10px;
+  padding: 4px 2px 6px 2px;
+  scrollbar-width: none;
 }
 
-.hub-card {
-  background: rgba(15, 23, 42, 0.65);
+.hub-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.hub-carousel-card {
+  flex: 0 0 76%;
+  max-width: 260px;
+  scroll-snap-align: center;
+  background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 6px;
-  transition: all 0.25s ease;
+  gap: 4px;
+  transition: all 0.2s ease;
 }
 
-.hub-card:hover {
+.hub-carousel-card:hover {
   border-color: rgba(56, 189, 248, 0.5);
-  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.18);
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.18);
   transform: translateY(-2px);
 }
 
@@ -1350,12 +1390,12 @@ body {
 }
 
 .card-icon {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .card-badge {
   font-size: 9px;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
@@ -1369,32 +1409,42 @@ body {
 }
 
 .card-title {
-  margin: 4px 0 0 0;
+  margin: 3px 0 0 0;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: var(--font-mono);
 }
 
 .card-desc {
-  margin: 0;
-  font-size: 11px;
-  color: #94a3b8;
-  line-height: 1.4;
-  flex-grow: 1;
+  margin: 2px 0 0 0;
+  font-size: 10.5px;
+  color: #cbd5e1;
+  line-height: 1.35;
+  min-height: 28px;
 }
 
 .hub-launch-btn {
   background: linear-gradient(135deg, #0284c7, #0369a1);
   border: 1px solid #38bdf8;
   color: #ffffff;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
   width: 100%;
   transition: all 0.2s ease;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .hub-launch-btn:active {
@@ -1402,133 +1452,124 @@ body {
   background: #0284c7;
 }
 
-/* 复古打鸭子卡片 */
-.retro-hunt-card {
-  background: rgba(10, 20, 15, 0.85);
-  border: 2px solid #22c55e;
-  border-radius: 10px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 复古光枪专属卡片风格 */
+.retro-game-card {
+  background: rgba(6, 24, 14, 0.85);
+  border: 1.5px solid #22c55e;
 }
 
-.retro-card-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+.retro-game-card:hover {
+  border-color: #4ade80;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.28);
 }
 
-.retro-banner-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.retro-banner-icon {
-  font-size: 32px;
-}
-
-.retro-banner-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 800;
+.retro-badge {
+  background: rgba(34, 197, 94, 0.2);
   color: #4ade80;
-  letter-spacing: 0.5px;
+  border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
-.retro-banner-desc {
-  margin: 2px 0 0 0;
-  font-size: 11px;
-  color: #a7f3d0;
-}
-
-.retro-hi-box {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  background: #000000;
-  border: 2px solid #ffffff;
-  padding: 4px 10px;
-  border-radius: 4px;
-}
-
-.retro-hi-box .hi-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
+.retro-hi {
   color: #22c55e;
+  font-weight: 800;
 }
 
-.retro-hi-box .hi-val {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  color: #ffffff;
-  font-weight: 900;
+.retro-title {
+  color: #4ade80;
 }
 
-.duck-submodes-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+.retro-subtitle {
+  color: #86efac;
 }
 
-.duck-submode-btn {
+.retro-desc {
+  color: #dcfce7;
+}
+
+.retro-launch-btn {
   background: #000000;
-  border: 2px solid #22c55e;
+  border: 1.5px solid #22c55e;
+  color: #4ade80;
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+}
+
+.retro-launch-btn:hover {
+  background: #14532d;
+  border-color: #4ade80;
   color: #ffffff;
-  padding: 10px 8px;
-  border-radius: 6px;
-  cursor: pointer;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
+
+/* 轮播圆点指示器 */
+.carousel-dots {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 4px;
-  text-align: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.carousel-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
   transition: all 0.2s ease;
 }
 
-.duck-submode-btn:hover {
-  background: #14532d;
-  border-color: #4ade80;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
-  transform: translateY(-2px);
+.carousel-dots .dot.active {
+  width: 16px;
+  border-radius: 4px;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
 }
 
-.duck-submode-btn:active {
-  transform: scale(0.95);
+#dots-retro .dot.active {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
 }
 
-.duck-submode-btn .submode-title {
-  font-size: 12px;
-  font-weight: 800;
-  color: #4ade80;
-}
-
-.duck-submode-btn .submode-detail {
-  font-size: 10px;
-  color: #cbd5e1;
+@media (min-width: 600px) {
+  .hub-carousel-card {
+    flex: 0 0 200px;
+  }
 }
 
 /* ==========================================================================
    NES 复古打鸭子 HUD 面板样式
    ========================================================================== */
 
+/* 打鸭子模式下，将底部控制栏抬高至 NES HUD 之上，彻底杜绝按钮与记分牌遮挡重叠 */
+body.duckhunt-active #bottom-bar {
+  margin-bottom: 74px;
+  padding-bottom: 2px;
+  z-index: 35;
+  pointer-events: auto;
+}
+
+@media (orientation: landscape) {
+  body.duckhunt-active #bottom-bar {
+    margin-bottom: 0;
+  }
+}
+
 .nes-hud {
   position: absolute;
   left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   background: #000000;
   border: 3px solid #ffffff;
   border-radius: 4px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   font-family: 'Courier New', Courier, monospace;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 10px rgba(255, 255, 255, 0.2);
-  z-index: 25;
+  z-index: 28;
+  max-width: 95vw;
 }
 
 .nes-hud-section {

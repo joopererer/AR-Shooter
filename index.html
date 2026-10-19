@@ -243,47 +243,59 @@
             <div class="category-header">
               <span class="category-icon">🌐</span>
               <div class="category-title-box">
-                <h3 class="category-title">全景射击体验 (360° AR Sandbox)</h3>
-                <p class="category-desc">360° 环绕空间 · 自由换枪 · 体感歪头探身 · 真实空间走位</p>
+                <div class="category-title-row">
+                  <h3 class="category-title">全景射击体验 (360° AR)</h3>
+                  <span class="carousel-hint">左右滑动 ➔</span>
+                </div>
+                <p class="category-desc">360° 环绕 · 自由换枪 · 体感歪头探身 · 空间走位</p>
               </div>
             </div>
 
-            <div class="hub-cards-grid">
+            <div class="hub-carousel-track" id="track-360">
               <!-- 荒野狩猎 -->
-              <div class="hub-card" data-mode="hunting">
+              <div class="hub-card hub-carousel-card" data-mode="hunting">
                 <div class="hub-card-top">
                   <span class="card-icon">🌲</span>
                   <span class="card-badge">360° 生态</span>
                   <span class="card-hi">HI: <strong id="hub-hi-hunting">0</strong></span>
                 </div>
-                <h4 class="card-title">荒野狩猎 (Wilderness Hunt)</h4>
-                <p class="card-desc">虚拟溪流、树木巨石掩体、猎鹿熊野猪与牛羊猎犬防误伤</p>
+                <h4 class="card-title">荒野狩猎</h4>
+                <p class="card-subtitle">Wilderness Hunt</p>
+                <p class="card-desc">虚拟溪流、树石掩体，猎鹿野猪与牛羊猎犬防误伤</p>
                 <button class="hub-launch-btn" data-mode="hunting">进入体验</button>
               </div>
 
               <!-- 星际防卫 -->
-              <div class="hub-card" data-mode="scifi">
+              <div class="hub-card hub-carousel-card" data-mode="scifi">
                 <div class="hub-card-top">
                   <span class="card-icon">🚀</span>
                   <span class="card-badge">战机座舱</span>
                   <span class="card-hi">HI: <strong id="hub-hi-scifi">0</strong></span>
                 </div>
-                <h4 class="card-title">星际防卫 (Sci-Fi Invasion)</h4>
-                <p class="card-desc">360°深空战机、虚拟座舱机动、曲率光速粒子雨与规避弹幕</p>
+                <h4 class="card-title">星际防卫</h4>
+                <p class="card-subtitle">Sci-Fi Invasion</p>
+                <p class="card-desc">360°深空战机、虚拟座舱机动、曲率粒子雨与弹幕规避</p>
                 <button class="hub-launch-btn" data-mode="scifi">进入体验</button>
               </div>
 
               <!-- 幽灵猎手 -->
-              <div class="hub-card" data-mode="ghost">
+              <div class="hub-card hub-carousel-card" data-mode="ghost">
                 <div class="hub-card-top">
                   <span class="card-icon">🎃</span>
                   <span class="card-badge">万圣幽冥</span>
                   <span class="card-hi">HI: <strong id="hub-hi-ghost">0</strong></span>
                 </div>
-                <h4 class="card-title">幽灵猎手 (Ghost Buster)</h4>
-                <p class="card-desc">360°万圣墓园、飞蝠走尸南瓜怪、12°手电筒光锥探照显形</p>
+                <h4 class="card-title">幽灵猎手</h4>
+                <p class="card-subtitle">Ghost Buster</p>
+                <p class="card-desc">360°万圣墓园、飞蝠走尸南瓜怪、12°手电筒探照显形</p>
                 <button class="hub-launch-btn" data-mode="ghost">进入体验</button>
               </div>
+            </div>
+
+            <div class="carousel-dots" id="dots-360">
+              <span class="dot active"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
             </div>
           </section>
 
@@ -292,40 +304,59 @@
             <div class="category-header">
               <span class="category-icon">🕹️</span>
               <div class="category-title-box">
-                <h3 class="category-title">复古光枪街机厅 (Retro Light-Gun Classics)</h3>
-                <p class="category-desc">固定正前方舞台 · 禁用摇杆与换枪 · 1:1 还原红白机算分规则</p>
+                <div class="category-title-row">
+                  <h3 class="category-title">复古光枪街机厅 (Retro Light-Gun)</h3>
+                  <span class="carousel-hint retro-hint">左右滑动 ➔</span>
+                </div>
+                <p class="category-desc">固定正前方舞台 · 锁定单发光线枪 · 1:1 NES 原版规则</p>
               </div>
             </div>
 
-            <div class="retro-hunt-card">
-              <div class="retro-card-banner">
-                <div class="retro-banner-left">
-                  <span class="retro-banner-icon">🦆</span>
-                  <div>
-                    <h4 class="retro-banner-title">FC 经典打鸭子 (Duck Hunt 1984)</h4>
-                    <p class="retro-banner-desc">正前方草丛遮挡 · 3发子弹硬核限制 · 5.5秒逃脱与猎犬魔性嘲笑</p>
-                  </div>
+            <div class="hub-carousel-track" id="track-retro">
+              <!-- GAME A: 单鸭模式 -->
+              <div class="hub-card hub-carousel-card retro-game-card" data-mode="duckhunt_a">
+                <div class="hub-card-top">
+                  <span class="card-icon">🦆</span>
+                  <span class="card-badge retro-badge">GAME A</span>
+                  <span class="card-hi retro-hi">HI: <strong id="hub-hi-duckhunt-a">000000</strong></span>
                 </div>
-                <div class="retro-hi-box">
-                  <span class="hi-label">BEST SCORE</span>
-                  <span id="hub-hi-duckhunt" class="hi-val">000000</span>
-                </div>
+                <h4 class="card-title retro-title">单鸭模式 (1 Duck)</h4>
+                <p class="card-subtitle retro-subtitle">FC Duck Hunt 1984</p>
+                <p class="card-desc retro-desc">每波 1 鸭出击，严格 3 发子弹，适合精准射击与控枪</p>
+                <button class="hub-launch-btn retro-launch-btn duck-submode-btn" data-mode="duckhunt_a">开始街机</button>
               </div>
 
-              <div class="duck-submodes-row">
-                <button class="duck-submode-btn btn-game-a" data-mode="duckhunt_a">
-                  <span class="submode-title">[GAME A: 单鸭模式]</span>
-                  <span class="submode-detail">每波 1 鸭出击 · 适合精准射击</span>
-                </button>
-                <button class="duck-submode-btn btn-game-b" data-mode="duckhunt_b">
-                  <span class="submode-title">[GAME B: 双鸭模式]</span>
-                  <span class="submode-detail">双鸭同时腾空 · 考验双发跟枪</span>
-                </button>
-                <button class="duck-submode-btn btn-game-c" data-mode="duckhunt_c">
-                  <span class="submode-title">[GAME C: 飞盘射击]</span>
-                  <span class="submode-detail">双向抛物线急速远去 · 极限预判</span>
-                </button>
+              <!-- GAME B: 双鸭模式 -->
+              <div class="hub-card hub-carousel-card retro-game-card" data-mode="duckhunt_b">
+                <div class="hub-card-top">
+                  <span class="card-icon">🦆</span>
+                  <span class="card-badge retro-badge">GAME B</span>
+                  <span class="card-hi retro-hi">HI: <strong id="hub-hi-duckhunt-b">000000</strong></span>
+                </div>
+                <h4 class="card-title retro-title">双鸭模式 (2 Ducks)</h4>
+                <p class="card-subtitle retro-subtitle">FC Duck Hunt 1984</p>
+                <p class="card-desc retro-desc">每波 2 鸭同时腾空，考验快速拉枪跟瞄与双发命中率</p>
+                <button class="hub-launch-btn retro-launch-btn duck-submode-btn" data-mode="duckhunt_b">开始街机</button>
               </div>
+
+              <!-- GAME C: 飞盘射击 -->
+              <div class="hub-card hub-carousel-card retro-game-card" data-mode="duckhunt_c">
+                <div class="hub-card-top">
+                  <span class="card-icon">🎯</span>
+                  <span class="card-badge retro-badge">GAME C</span>
+                  <span class="card-hi retro-hi">HI: <strong id="hub-hi-duckhunt-c">000000</strong></span>
+                </div>
+                <h4 class="card-title retro-title">飞盘射击 (Clay Shooting)</h4>
+                <p class="card-subtitle retro-subtitle">FC Duck Hunt 1984</p>
+                <p class="card-desc retro-desc">双向抛物线急速远去，飞盘远距离透视缩小，极限预判</p>
+                <button class="hub-launch-btn retro-launch-btn duck-submode-btn" data-mode="duckhunt_c">开始街机</button>
+              </div>
+            </div>
+
+            <div class="carousel-dots" id="dots-retro">
+              <span class="dot active"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
             </div>
           </section>
         </div>

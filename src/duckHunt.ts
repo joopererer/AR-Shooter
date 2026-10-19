@@ -84,9 +84,16 @@ export class DuckHuntEngine {
   private activeDucks: DuckEntity[] = [];
   private activeClays: ClayEntity[] = [];
 
-  // 猎犬状态
+  // 猎犬状态与部件引用
   private dogGroup = new THREE.Group();
   private dogState: 'hidden' | 'intro' | 'celebrating' | 'laughing' = 'hidden';
+  private dogEarLeft?: THREE.Mesh;
+  private dogEarRight?: THREE.Mesh;
+  private dogPaws?: THREE.Group;
+  private dogHead?: THREE.Mesh;
+  private caughtDucksGroup?: THREE.Group;
+  private dogTargetY: number = -2.2;
+  private dogCurrentY: number = -2.2;
 
   // 飞盘碎片系统
   private debrisMeshes: { mesh: THREE.Mesh; vel: THREE.Vector3; life: number }[] = [];
@@ -494,6 +501,7 @@ export class DuckHuntEngine {
    * 触发 5.5s 逃脱 (FLY AWAY!) 状态
    */
   private triggerFlyAway(): void {
+    if (this.isFlyAway) return;
     this.isFlyAway = true;
     this.emitHUD();
 
@@ -501,11 +509,51 @@ export class DuckHuntEngine {
     this.activeDucks.forEach((d) => {
       if (d.state === 'flying') {
         d.state = 'fleeing_up';
-        d.velocity.set(0, 8.5, 0);
+        d.velocity.set(0, 11.0, 0); // 极速飞天逃逸
         d.meshGroup.rotation.z = 0;
         d.meshGroup.rotation.x = -Math.PI / 3;
       }
     });
+
+    // 统计本波命中数，将剩余未打中的格子标为 miss
+    const targetStartIndex = this.waveIndex * this.targetsPerWave;
+    let waveHits = 0;
+    for (let i = 0; i < this.targetsPerWave; i++) {
+      if (this.targetResults[targetStartIndex + i] === 'hit') {
+        waveHits++;
+      } else {
+        this.targetResults[targetStartIndex + i] = 'miss';
+      }
+    }
+    this.emitHUD();
+
+    if (this.submode !== 'game_c') {
+      this.isWaveActive = false;
+      if (waveHits === 0) {
+        // 0 命中：鸭子飞走，猎犬立即从草丛后探出捂嘴魔性大笑！
+        setTimeout(() => {
+          this.triggerDogLaugh(() => {
+            this.waveIndex++;
+            this.startNextWave();
+          });
+        }, 220);
+      } else {
+        // 部分命中（如 Game B 2中1）：展示打中那只
+        setTimeout(() => {
+          this.triggerDogCatch(waveHits, () => {
+            this.waveIndex++;
+            this.startNextWave();
+          });
+        }, 350);
+      }
+    } else {
+      // Game C 飞盘射击直接下一波
+      this.isWaveActive = false;
+      setTimeout(() => {
+        this.waveIndex++;
+        this.startNextWave();
+      }, 1000);
+    }
   }
 
   // ==========================================================================
@@ -626,7 +674,7 @@ export class DuckHuntEngine {
    * 检查本波次是否所有目标均已完结 (击落或逃脱)
    */
   private checkWaveResolution(): void {
-    if (!this.isWaveActive) return;
+    if (!this.isWaveActive || this.isFlyAway) return;
 
     const allFinished =
       (this.submode === 'game_c'
@@ -733,92 +781,206 @@ export class DuckHuntEngine {
   // ==========================================================================
 
   private buildDogModel(): void {
+    if (!this.rootGroup.children.includes(this.dogGroup)) {
+      this.rootGroup.add(this.dogGroup);
+    }
     while (this.dogGroup.children.length > 0) {
       this.dogGroup.remove(this.dogGroup.children[0]);
     }
 
-    this.dogGroup.position.set(0, -1.8, -7.5);
+    this.dogCurrentY = -2.2;
+    this.dogTargetY = -2.2;
+    this.dogGroup.position.set(0, this.dogCurrentY, -8.05);
 
-    const dogMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8, flatShading: true });
+    const dogBrown = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.8, flatShading: true });
+    const earBrown = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.8 });
+    const muzzleCream = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.7 });
+    const collarRed = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 });
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8 });
-    const noseMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+    const blackMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
 
-    // 身体
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.9, 0.55), dogMat);
-    body.position.y = 0.45;
+    // 1. 躯干
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.0, 0.65), dogBrown);
+    body.position.y = 0.5;
     this.dogGroup.add(body);
 
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.1), whiteMat);
-    chest.position.set(0, 0.45, 0.28);
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.12), whiteMat);
+    chest.position.set(0, 0.5, 0.33);
     this.dogGroup.add(chest);
 
-    // 狗头
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.6), dogMat);
-    head.position.set(0, 1.15, 0.1);
-    this.dogGroup.add(head);
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 0.58), collarRed);
+    collar.position.set(0, 0.98, 0.05);
+    this.dogGroup.add(collar);
 
-    // 下垂大耳朵
-    [-0.38, 0.38].forEach((ex) => {
-      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.65, 0.3), dogMat);
-      ear.position.set(ex, 1.05, 0.1);
-      this.dogGroup.add(ear);
+    // 2. 狗头
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.7, 0.65), dogBrown);
+    head.position.set(0, 1.35, 0.1);
+    this.dogGroup.add(head);
+    this.dogHead = head;
+
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.34, 0.38), muzzleCream);
+    muzzle.position.set(0, -0.12, 0.38);
+    head.add(muzzle);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.18), blackMat);
+    nose.position.set(0, 0.08, 0.22);
+    muzzle.add(nose);
+
+    // 眯眼笑
+    [-0.18, 0.18].forEach((eyeX) => {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.04), blackMat);
+      eye.position.set(eyeX, 0.12, 0.34);
+      head.add(eye);
     });
 
-    // 黑色大鼻子
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.22), noseMat);
-    nose.position.set(0, 1.12, 0.45);
-    this.dogGroup.add(nose);
+    // 3. 经典垂耳
+    const earGeo = new THREE.BoxGeometry(0.2, 0.75, 0.32);
+    const earL = new THREE.Mesh(earGeo, earBrown);
+    earL.position.set(-0.46, 1.25, 0.1);
+    this.dogGroup.add(earL);
+    this.dogEarLeft = earL;
 
-    // 举起鸭子的双手爪子 (Celebration Paws)
-    const paw = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), whiteMat);
-    paw.position.set(0, 1.25, 0.4);
-    this.dogGroup.add(paw);
+    const earR = new THREE.Mesh(earGeo, earBrown);
+    earR.position.set(0.46, 1.25, 0.1);
+    this.dogGroup.add(earR);
+    this.dogEarRight = earR;
+
+    // 4. 捂嘴爪子
+    const pawsGroup = new THREE.Group();
+    pawsGroup.position.set(0, 1.18, 0.46);
+    [-0.16, 0.16].forEach((px) => {
+      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.22), whiteMat);
+      paw.position.set(px, 0, 0);
+      paw.rotation.x = -0.3;
+      pawsGroup.add(paw);
+
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.02), blackMat);
+      pad.position.set(0, -0.02, 0.11);
+      paw.add(pad);
+    });
+    this.dogGroup.add(pawsGroup);
+    this.dogPaws = pawsGroup;
+
+    // 5. 举起战利品鸭子
+    const caughtGroup = new THREE.Group();
+    caughtGroup.position.set(0, 1.35, 0.35);
+    caughtGroup.visible = false;
+    this.dogGroup.add(caughtGroup);
+    this.caughtDucksGroup = caughtGroup;
   }
 
   private triggerDogIntro(onDone: () => void): void {
     this.dogState = 'intro';
     this.audioManager.playNesDogIntro();
 
-    // 从左侧走入草丛中间并跳跃
-    this.dogGroup.position.set(-2.4, -1.45, -7.5);
+    this.dogGroup.position.set(-2.4, -1.45, -8.05);
+    this.dogCurrentY = -1.45;
+    this.dogTargetY = -1.45;
+    if (this.dogPaws) this.dogPaws.visible = false;
+    if (this.caughtDucksGroup) this.caughtDucksGroup.visible = false;
+
     setTimeout(onDone, 2400);
   }
 
-  private triggerDogCatch(_caughtCount: number, onDone: () => void): void {
+  private triggerDogCatch(caughtCount: number, onDone: () => void): void {
+    if (this.submode === 'game_c') {
+      onDone();
+      return;
+    }
     this.dogState = 'celebrating';
-    this.dogGroup.position.set(0, -0.65, -7.5); // 从草丛后方跃起露脸
+    this.dogGroup.position.x = 0;
+    this.dogTargetY = -0.55;
+    if (this.dogPaws) this.dogPaws.visible = false;
+    if (this.caughtDucksGroup) {
+      this.caughtDucksGroup.visible = true;
+      while (this.caughtDucksGroup.children.length > 0) {
+        this.caughtDucksGroup.remove(this.caughtDucksGroup.children[0]);
+      }
+      const duckMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
+      const billMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const offsets = caughtCount === 1 ? [0] : [-0.35, 0.35];
+      offsets.forEach((ox) => {
+        const duckModel = new THREE.Group();
+        const dBody = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.45, 0.3), duckMat);
+        duckModel.add(dBody);
+        const dHead = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.26), duckMat);
+        dHead.position.set(0, 0.3, 0.05);
+        duckModel.add(dHead);
+        const dBill = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.2), billMat);
+        dBill.position.set(0, 0.26, 0.2);
+        duckModel.add(dBill);
+        duckModel.position.set(ox, 0, 0);
+        this.caughtDucksGroup!.add(duckModel);
+      });
+    }
+
     this.audioManager.playNesDogCatch();
 
     setTimeout(() => {
-      this.dogGroup.position.set(0, -1.8, -7.5);
-      this.dogState = 'hidden';
-      onDone();
-    }, 1350);
+      this.dogTargetY = -2.2;
+      setTimeout(() => {
+        this.dogState = 'hidden';
+        onDone();
+      }, 350);
+    }, 1450);
   }
 
   private triggerDogLaugh(onDone: () => void): void {
+    if (this.submode === 'game_c') {
+      onDone();
+      return;
+    }
     this.dogState = 'laughing';
-    this.dogGroup.position.set(0, -0.75, -7.5);
+    this.dogGroup.position.x = 0;
+    this.dogTargetY = -0.55; // 升出草丛，头部、胸口和捂嘴双手清晰露面
+    if (this.dogPaws) this.dogPaws.visible = true;
+    if (this.caughtDucksGroup) this.caughtDucksGroup.visible = false;
+
     this.audioManager.playNesDogLaugh();
 
     setTimeout(() => {
-      this.dogGroup.position.set(0, -1.8, -7.5);
-      this.dogState = 'hidden';
-      onDone();
-    }, 1600);
+      this.dogTargetY = -2.2; // 嘲笑结束后平滑缩回草丛下
+      setTimeout(() => {
+        this.dogState = 'hidden';
+        onDone();
+      }, 350);
+    }, 1650);
   }
 
   private updateDogAnimation(delta: number): void {
+    // 平滑升降插值
+    this.dogCurrentY += (this.dogTargetY - this.dogCurrentY) * Math.min(1.0, delta * 12.0);
+    this.dogGroup.position.y = this.dogCurrentY;
+
+    const time = performance.now() * 0.001;
+
     if (this.dogState === 'intro') {
-      // 闻嗅前行后跳入草丛
-      this.dogGroup.position.x += 1.2 * delta;
+      this.dogGroup.position.x += 1.3 * delta;
       if (this.dogGroup.position.x > 0.0) {
-        this.dogGroup.position.y -= 2.5 * delta;
+        this.dogTargetY = -2.2;
       }
     } else if (this.dogState === 'laughing') {
-      // 经典捂嘴肩膀上下魔性抖动 (Ha-ha-ha-ha)
-      const shake = Math.sin(performance.now() * 0.04) * 0.08;
-      this.dogGroup.position.y = -0.75 + shake;
+      // 经典魔性双肩快速上下抖动 + 捂嘴颤动 + 大耳朵扑腾
+      const bounce = Math.sin(time * 24.0) * 0.06;
+      this.dogGroup.position.y = this.dogCurrentY + bounce;
+
+      if (this.dogEarLeft && this.dogEarRight) {
+        const earFlap = Math.sin(time * 24.0) * 0.25;
+        this.dogEarLeft.rotation.z = earFlap;
+        this.dogEarRight.rotation.z = -earFlap;
+      }
+
+      if (this.dogPaws) {
+        this.dogPaws.position.y = 1.18 + Math.sin(time * 24.0) * 0.03;
+      }
+
+      if (this.dogHead) {
+        this.dogHead.rotation.z = Math.sin(time * 12.0) * 0.08;
+      }
+    } else if (this.dogState === 'celebrating') {
+      if (this.dogHead) {
+        this.dogHead.rotation.z = Math.sin(time * 6.0) * 0.05;
+      }
     }
   }
 
@@ -937,10 +1099,16 @@ export class DuckHuntEngine {
       });
     }
 
+    // 重新将 dogGroup 挂载入 rootGroup 保证随时可用
+    this.rootGroup.add(this.dogGroup);
+
     this.activeDucks = [];
     this.activeClays = [];
     this.debrisMeshes = [];
     this.isWaveActive = false;
     this.isFlyAway = false;
+    this.dogState = 'hidden';
+    this.dogTargetY = -2.2;
+    this.dogCurrentY = -2.2;
   }
 }

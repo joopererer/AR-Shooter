@@ -104,7 +104,6 @@ class ArShooterGame {
   private gameHubModalEl: HTMLElement;
   private hubCloseBtnEl: HTMLElement;
   private hubLaunchBtnEls: NodeListOf<HTMLButtonElement>;
-  private duckSubmodeBtnEls: NodeListOf<HTMLButtonElement>;
 
   // NES 复古打鸭子 HUD 与弹窗 DOM
   private nesHudEl: HTMLElement;
@@ -170,7 +169,6 @@ class ArShooterGame {
     this.gameHubModalEl = document.getElementById('game-hub-modal')!;
     this.hubCloseBtnEl = document.getElementById('hub-close-btn')!;
     this.hubLaunchBtnEls = document.querySelectorAll('.hub-launch-btn');
-    this.duckSubmodeBtnEls = document.querySelectorAll('.duck-submode-btn');
 
     // NES 打鸭子 HUD DOM
     this.nesHudEl = document.getElementById('nes-hud')!;
@@ -330,7 +328,7 @@ class ArShooterGame {
       this.closeGameHub();
     });
 
-    // 大厅 360 度模式卡片点击进入
+    // 大厅所有模式卡片启动按钮 (360全景与复古光枪)
     this.hubLaunchBtnEls.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -339,14 +337,9 @@ class ArShooterGame {
       });
     });
 
-    // 大厅打鸭子子模式选择按钮
-    this.duckSubmodeBtnEls.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mode = btn.dataset.mode as GameMode;
-        if (mode) this.launchMode(mode);
-      });
-    });
+    // 监听横向滑动更新轮播圆点指示器
+    this.setupCarouselTrack('track-360', 'dots-360');
+    this.setupCarouselTrack('track-retro', 'dots-retro');
 
     // NES Game Over 重玩与返回大厅
     this.nesRetryBtnEl.addEventListener('click', (e) => {
@@ -467,15 +460,29 @@ class ArShooterGame {
     this.gameHubModalEl.classList.add('hidden');
   }
 
+  private setupCarouselTrack(trackId: string, dotsId: string): void {
+    const track = document.getElementById(trackId);
+    const dotsContainer = document.getElementById(dotsId);
+    if (!track || !dotsContainer) return;
+
+    const dots = dotsContainer.querySelectorAll('.dot');
+    track.addEventListener('scroll', () => {
+      const cardWidth = track.clientWidth * 0.76;
+      const index = Math.min(dots.length - 1, Math.max(0, Math.round(track.scrollLeft / cardWidth)));
+      dots.forEach((dot, idx) => {
+        if (idx === index) dot.classList.add('active');
+        else dot.classList.remove('active');
+      });
+    }, { passive: true });
+  }
+
   private refreshHubHighScores(): void {
     const huntingHi = this.modeManager.getHighScore('hunting');
     const scifiHi = this.modeManager.getHighScore('scifi');
     const ghostHi = this.modeManager.getHighScore('ghost');
-    const duckHi = Math.max(
-      this.modeManager.getHighScore('duckhunt_a'),
-      this.modeManager.getHighScore('duckhunt_b'),
-      this.modeManager.getHighScore('duckhunt_c')
-    );
+    const duckAHi = this.modeManager.getHighScore('duckhunt_a');
+    const duckBHi = this.modeManager.getHighScore('duckhunt_b');
+    const duckCHi = this.modeManager.getHighScore('duckhunt_c');
 
     const elH = document.getElementById('hub-hi-hunting');
     if (elH) elH.textContent = huntingHi.toString();
@@ -483,8 +490,12 @@ class ArShooterGame {
     if (elS) elS.textContent = scifiHi.toString();
     const elG = document.getElementById('hub-hi-ghost');
     if (elG) elG.textContent = ghostHi.toString();
-    const elD = document.getElementById('hub-hi-duckhunt');
-    if (elD) elD.textContent = duckHi.toString().padStart(6, '0');
+    const elDA = document.getElementById('hub-hi-duckhunt-a');
+    if (elDA) elDA.textContent = duckAHi.toString().padStart(6, '0');
+    const elDB = document.getElementById('hub-hi-duckhunt-b');
+    if (elDB) elDB.textContent = duckBHi.toString().padStart(6, '0');
+    const elDC = document.getElementById('hub-hi-duckhunt-c');
+    if (elDC) elDC.textContent = duckCHi.toString().padStart(6, '0');
   }
 
   public launchMode(mode: GameMode): void {
@@ -497,6 +508,8 @@ class ArShooterGame {
     this.gameModeTextEl.textContent = cfg.shortName;
 
     if (cfg.isRetroLightGun) {
+      document.body.classList.add('duckhunt-active');
+
       // 1. 彻底清空 360 沙盒环境与生态实体
       this.environmentManager.clearEnvironment();
       this.entityManager.clearAll();
@@ -523,6 +536,8 @@ class ArShooterGame {
       this.duckHuntEngine.start(cfg.duckHuntSubmode!);
       this.showStatusNotification(`进入【${cfg.shortName}】`);
     } else {
+      document.body.classList.remove('duckhunt-active');
+
       // 1. 彻底清空打鸭子舞台
       this.duckHuntEngine.clear();
       this.nesHudEl.classList.add('hidden');
