@@ -101,6 +101,7 @@ class ArShooterGame {
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.xr.setReferenceSpaceType('local');
 
     // 5. 构建光照体系
     this.setupLighting();

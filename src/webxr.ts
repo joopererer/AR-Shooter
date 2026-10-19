@@ -1,7 +1,8 @@
 /**
  * AR-Shooter WebXR 6DoF 空间追踪管理器 (webxr.ts)
  * 封装 W3C WebXR Device API 的 immersive-ar 会话控制、
- * 硬件 SLAM / ARCore 支持度探测、DOM Overlay 穿透绑定与退出生命周期管理。
+ * 解决移动端 referenceSpaceType 默认 'local-floor' 导致的崩溃报错，
+ * 支持 'local' / 'viewer' 阶梯降级与 DOM Overlay 穿透绑定。
  */
 
 import * as THREE from 'three';
@@ -52,30 +53,61 @@ export class WebXRManager {
   }
 
   /**
-   * 启动工业级 6DoF WebXR AR 实景会话 (调用 ARCore / SLAM 特征追踪)
+   * 启动 6DoF WebXR AR 实景会话 (调用 ARCore / SLAM 特征追踪)
    */
   public async startSession(overlayRoot?: HTMLElement): Promise<boolean> {
     if (!('xr' in navigator) || !navigator.xr) {
       throw new Error('当前浏览器不支持 WebXR Device API');
     }
 
-    try {
-      const sessionInit: XRSessionInit = {
-        requiredFeatures: ['local'],
-        optionalFeatures: ['dom-overlay', 'hit-test', 'light-estimation'],
-      };
+    // 核心避坑：同时请求 local 与 local-floor 等可选特性，避免部分机型报特性不支持
+    const sessionInit: XRSessionInit = {
+      optionalFeatures: [
+        'local',
+        'local-floor',
+        'bounded-floor',
+        'dom-overlay',
+        'hit-test',
+        'light-estimation',
+      ],
+    };
 
-      // 允许将 HUD 挂载到 WebXR 穿透上层
-      if (overlayRoot && typeof XRSystem !== 'undefined') {
-        (sessionInit as unknown as { domOverlay: { root: HTMLElement } }).domOverlay = {
-          root: overlayRoot,
-        };
+    // 允许将 HUD 挂载到 WebXR 穿透上层
+    if (overlayRoot && typeof XRSystem !== 'undefined') {
+      (sessionInit as unknown as { domOverlay: { root: HTMLElement } }).domOverlay = {
+        root: overlayRoot,
+      };
+    }
+
+    try {
+      let session: XRSession;
+
+      try {
+        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+      } catch (errDomOverlay) {
+        console.warn('[WebXRManager] 带 domOverlay 请求失败，尝试纯净模式:', errDomOverlay);
+        // 如果是因为 dom-overlay 失败，去掉 dom-overlay 重新尝试
+        delete (sessionInit as unknown as { domOverlay?: unknown }).domOverlay;
+        sessionInit.optionalFeatures = ['local', 'local-floor', 'hit-test'];
+        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
       }
 
-      const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
       this.currentSession = session;
 
-      // 开启 Three.js WebXR 渲染管线对接
+      // 核心修复：Three.js 默认 referenceSpaceType 是 'local-floor'，
+      // 如果设备没有地面深度雷达，调用 requestReferenceSpace 会直接抛出：
+      // "This device does not support the requested reference space type"
+      // 我们显式设置为 'local'（以相机启动原点为参考系）；如果失败再尝试 'viewer'
+      try {
+        await this.renderer.xr.setReferenceSpaceType('local');
+      } catch (refErr) {
+        console.warn('[WebXRManager] 设置 local 空间失败，尝试降级:', refErr);
+        try {
+          await this.renderer.xr.setReferenceSpaceType('viewer');
+        } catch {}
+      }
+
+      // 开启 Three.js WebXR 渲染对接
       this.renderer.xr.enabled = true;
       await this.renderer.xr.setSession(session);
 
