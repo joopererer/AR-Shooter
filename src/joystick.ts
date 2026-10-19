@@ -162,11 +162,15 @@ export class VirtualJoystick {
   }
 
   /**
-   * 每一帧读取当前的移动向量并平移相机
-   * moveSpeed: 移动速度 (m/s)
+   * 每一帧读取当前的移动向量并平移目标对象 (PlayerRig 或 Camera)
+   * 采用 targetObject 支持 WebXR 下的相机会话不受覆写
    */
-  public applyMovement(camera: THREE.Camera, delta: number, moveSpeed: number = 3.6): void {
-    // 融合触控摇杆与键盘输入
+  public applyMovement(
+    targetObject: THREE.Object3D,
+    camera: THREE.Camera,
+    delta: number,
+    moveSpeed: number = 3.6
+  ): void {
     let moveX = this.outputVector.x;
     let moveY = this.outputVector.y;
 
@@ -175,7 +179,6 @@ export class VirtualJoystick {
     if (this.keyboardState.left) moveX -= 1.0;
     if (this.keyboardState.right) moveX += 1.0;
 
-    // 限制向量长度最大为 1
     const len = Math.hypot(moveX, moveY);
     if (len > 1.0) {
       moveX /= len;
@@ -184,22 +187,21 @@ export class VirtualJoystick {
 
     if (Math.abs(moveX) < 1e-4 && Math.abs(moveY) < 1e-4) return;
 
-    // 提取相机当前的水平朝向前方向量 (在 XZ 平面)
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    forward.y = 0; // 锁定在水平面上走动，不往天上看时冲天飞起
+    // 提取当前实际相机在世界空间的水平朝向前方向量 (在 XZ 平面)
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
     forward.normalize();
 
-    // 计算右方向量
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    right.y = 0;
-    right.normalize();
+    // 计算世界水平平面的右方向量
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).negate().normalize();
 
-    // 叠加位移: forward * moveY + right * moveX
+    // 叠加位移到 targetObject (PlayerRig) 上
     const displacement = new THREE.Vector3()
       .addScaledVector(forward, moveY * moveSpeed * delta)
       .addScaledVector(right, moveX * moveSpeed * delta);
 
-    camera.position.add(displacement);
+    targetObject.position.add(displacement);
   }
 
   public setVisible(visible: boolean): void {

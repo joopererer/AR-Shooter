@@ -15,8 +15,9 @@ import { WebXRManager } from './webxr';
 export type LocomotionMode = 'joystick' | 'webxr' | 'stationary';
 
 class ArShooterGame {
-  // 3D 渲染核心
+  // 3D 渲染核心与玩家控制容器 (PlayerRig 解决 WebXR 模式下摇杆坐标被底层覆写失效的问题)
   private scene: THREE.Scene;
+  private playerRig = new THREE.Group();
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private clock = new THREE.Clock();
@@ -82,13 +83,15 @@ class ArShooterGame {
     this.soundIconOnEl = document.getElementById('sound-icon-on')!;
     this.soundIconOffEl = document.getElementById('sound-icon-off')!;
 
-    // 2. 初始化 Three.js 场景
+    // 2. 初始化 Three.js 场景与玩家 Rig 控制容器
     this.scene = new THREE.Scene();
+    this.scene.add(this.playerRig);
 
-    // 3. 初始化透视相机
+    // 3. 初始化透视相机并挂载到 playerRig 下
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(70, aspect, 0.1, 1000);
     this.camera.position.set(0, 0, 0);
+    this.playerRig.add(this.camera);
 
     // 4. 初始化透明渲染画布
     const canvas = document.getElementById('ar-canvas') as HTMLCanvasElement;
@@ -237,11 +240,11 @@ class ArShooterGame {
       this.cycleLocomotionMode();
     });
 
-    // 重新定格校准按钮 (视角重置正前，位置重置回原点)
+    // 重新定格校准按钮 (视角重置正前，位置与玩家 Rig 重置回原点)
     this.recalibrateBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
       this.gyroController.recalibrate();
-      // 位置重置回原点 (0, 0, 0)
+      this.playerRig.position.set(0, 0, 0);
       this.camera.position.set(0, 0, 0);
       this.showStatusNotification('视角与站位已重置');
       this.playCalibrateSound();
@@ -336,6 +339,7 @@ class ArShooterGame {
 
     // 首次定格校准
     this.gyroController.recalibrate();
+    this.playerRig.position.set(0, 0, 0);
     this.camera.position.set(0, 0, 0);
 
     // 隐藏启动弹窗
@@ -432,7 +436,8 @@ class ArShooterGame {
    * 创建科幻激光束
    */
   private createLaserBeam(start: THREE.Vector3, end: THREE.Vector3): void {
-    const origin = start.clone().add(new THREE.Vector3(0, -0.2, 0).applyQuaternion(this.camera.quaternion));
+    const activeCam = this.getActiveCamera();
+    const origin = start.clone().add(new THREE.Vector3(0, -0.2, 0).applyQuaternion(activeCam.quaternion));
     const dir = new THREE.Vector3().subVectors(end, origin);
     const len = dir.length();
 
@@ -655,9 +660,9 @@ class ArShooterGame {
       this.gyroController.update(delta);
     }
 
-    // 2. 摇杆位移推进 (支持摇杆走动推进靠近怪物)
+    // 2. 摇杆位移推进 (无论普通模式还是 WebXR 模式均平移 playerRig，彻底解决 WebXR 下摇杆失效的问题)
     if (this.virtualJoystick.getIsVisible() && this.isGameRunning) {
-      this.virtualJoystick.applyMovement(this.camera, delta, 3.6);
+      this.virtualJoystick.applyMovement(this.playerRig, activeCam, delta, 4.0);
     }
 
     // 3. 更新怪物动画与 FOV 衰减 (使用当前真实活动相机)
