@@ -174,13 +174,13 @@ export class AudioManager {
   }
 
   /**
-   * 掩体彻底破坏与崩裂音效 (巨石崩塌、树木断裂、能量盾溃散)
+   * 掩体彻底破坏与崩裂音效 (巨石崩塌、树木断裂、能量盾溃散、墓碑/陨石碎裂、南瓜爆裂)
    */
-  public playObstacleDestroyed(type: 'rock' | 'tree' | 'bush' | 'shield'): void {
+  public playObstacleDestroyed(type: 'rock' | 'tree' | 'bush' | 'shield' | 'tombstone' | 'pumpkin' | 'asteroid' | string): void {
     if (!this.isEnabled || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;
-      if (type === 'rock') {
+      if (type === 'rock' || type === 'tombstone' || type === 'asteroid') {
         // 低频爆碎震颤 + 轰鸣碎石
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -219,6 +219,19 @@ export class AudioManager {
         gain.connect(this.ctx.destination);
         osc.start(now);
         osc.stop(now + 0.39);
+      } else if (type === 'pumpkin') {
+        // 南瓜浆汁爆裂音
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.28);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.29);
       } else {
         // 灌木枝叶飞舞散落
         const osc = this.ctx.createOscillator();
@@ -303,6 +316,62 @@ export class AudioManager {
       gain.connect(this.ctx.destination);
       osc.start(now);
       osc.stop(now + 0.09);
+    } catch {}
+  }
+
+  /**
+   * 飞船护盾受击音效 (等离子偏转爆鸣 + 警报嗡鸣)
+   */
+  public playShipShieldHit(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 1. 偏转能量爆发
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(480, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.22);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.23);
+
+      // 2. 战舰护盾过载短音
+      const beep = this.ctx.createOscillator();
+      const beepGain = this.ctx.createGain();
+      beep.type = 'square';
+      beep.frequency.setValueAtTime(880, now + 0.05);
+      beep.frequency.exponentialRampToValueAtTime(440, now + 0.18);
+      beepGain.gain.setValueAtTime(0.2, now + 0.05);
+      beepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      beep.connect(beepGain);
+      beepGain.connect(this.ctx.destination);
+      beep.start(now + 0.05);
+      beep.stop(now + 0.19);
+    } catch {}
+  }
+
+  /**
+   * 敌机等离子开火音效 (尖锐滑音)
+   */
+  public playEnemyLaserFire(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1400, now);
+      osc.frequency.exponentialRampToValueAtTime(320, now + 0.15);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.16);
     } catch {}
   }
 }

@@ -24,19 +24,19 @@ export class ModeManager {
       id: 'hunting',
       name: '荒野狩猎',
       icon: '🌲',
-      description: '自然溪流、树石掩体、猎鹿熊猪与友军保护',
+      description: '360°开放原野、逼真生灵姿态与自然掩体',
     },
     {
       id: 'scifi',
       name: '星际防卫',
-      icon: '👾',
-      description: '浮空多面体异兽、能量护盾阻挡与重火力扫射',
+      icon: '🚀',
+      description: '360°太空战机、虚拟座舱机动、歼灭敌舰与规避弹幕',
     },
     {
       id: 'ghost',
-      name: '幽灵猎手',
-      icon: '👻',
-      description: '隐身浮空幽灵、12度准星手电筒照亮显形',
+      name: '万圣夜惊魂',
+      icon: '🎃',
+      description: '360°万圣墓园、飞蝠走尸南瓜怪、12°手电照亮显形',
     },
   ];
 

@@ -125,6 +125,10 @@ export class WeaponManager {
     return cfg;
   }
 
+  public setVisible(visible: boolean): void {
+    this.weaponRig.visible = visible;
+  }
+
   public getCurrentConfig(): WeaponConfig {
     return this.configs[this.currentType];
   }

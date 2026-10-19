@@ -15,6 +15,7 @@ import { EnvironmentManager } from './environment';
 import { EntityManager, GameEntity } from './entities';
 import { WeaponManager, WeaponType, WeaponConfig } from './weapons';
 import { ModeManager, GameMode } from './modes';
+import { CockpitManager } from './cockpit';
 
 export type LocomotionMode = 'joystick' | 'webxr' | 'stationary';
 
@@ -41,6 +42,7 @@ class ArShooterGame {
   private environmentManager: EnvironmentManager;
   private entityManager: EntityManager;
   private weaponManager: WeaponManager;
+  private cockpitManager: CockpitManager;
   private modeManager: ModeManager;
 
   // 控制模式与状态
@@ -163,8 +165,13 @@ class ArShooterGame {
     this.indicatorManager = new IndicatorManager('indicator-container');
     this.virtualJoystick = new VirtualJoystick('joystick-zone');
     this.environmentManager = new EnvironmentManager(this.scene);
-    this.entityManager = new EntityManager(this.scene);
+    this.entityManager = new EntityManager(
+      this.scene,
+      () => this.handlePlayerHitByEnemy(),
+      () => this.audioManager.playEnemyLaserFire()
+    );
     this.weaponManager = new WeaponManager(this.camera, (cfg) => this.onWeaponSwitched(cfg));
+    this.cockpitManager = new CockpitManager(this.camera);
     this.modeManager = new ModeManager('hunting', (mode) => this.onModeSwitched(mode));
 
     // WebXR 会话管理器
@@ -387,17 +394,38 @@ class ArShooterGame {
   }
 
   private applyCurrentModeContent(mode: GameMode): void {
+    this.entityManager.setMode(mode);
     if (mode === 'hunting') {
       this.environmentManager.initHuntingEnvironment();
       this.entityManager.initHuntingEcosystem();
+      this.cockpitManager.setVisible(false);
+      this.weaponManager.setVisible(true);
     } else if (mode === 'scifi') {
       this.environmentManager.initSciFiEnvironment();
       this.entityManager.initSciFiEcosystem();
+      this.cockpitManager.setVisible(true);
+      this.weaponManager.setVisible(false); // 星际模式下由战机外置双主炮开火
     } else if (mode === 'ghost') {
-      this.environmentManager.initSciFiEnvironment();
+      this.environmentManager.initHalloweenEnvironment();
       this.entityManager.initGhostEcosystem();
+      this.cockpitManager.setVisible(false);
+      this.weaponManager.setVisible(true);
     }
     this.updateTargetCountUI();
+  }
+
+  /**
+   * 玩家飞船遭受敌方战机等离子光弹击中
+   */
+  private handlePlayerHitByEnemy(): void {
+    if (this.modeManager.getMode() === 'scifi') {
+      this.cockpitManager.triggerShieldHit();
+    }
+    this.audioManager.playShipShieldHit();
+    this.triggerFriendlyWarningFlash();
+    this.score = Math.max(0, this.score - 150);
+    this.scoreValEl.textContent = this.score.toString();
+    this.showHitPopup('⚠️ 战机护盾遭受等离子轰击 -150', true, 'friendly-penalty');
   }
 
   private cycleLocomotionMode(): void {
@@ -774,8 +802,9 @@ class ArShooterGame {
     // 4. 生态实体 AI 移动与更新
     this.entityManager.update(delta, activeCam);
 
-    // 5. 3D 枪模呼吸摆动与后坐力回弹
+    // 5. 3D 枪模呼吸摆动与后坐力回弹 / 战机座舱姿态
     this.weaponManager.update(delta);
+    this.cockpitManager.update(delta, this.virtualJoystick.getOutputVector());
 
     // 6. 激光弹道生命期
     this.updateLasers(delta);

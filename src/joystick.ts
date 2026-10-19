@@ -213,6 +213,13 @@ export class VirtualJoystick {
     return this.isVisible;
   }
 
+  public getOutputVector(): JoystickVector {
+    return {
+      x: this.outputVector.x + (this.keyboardState.right ? 1 : 0) - (this.keyboardState.left ? 1 : 0),
+      y: this.outputVector.y + (this.keyboardState.forward ? 1 : 0) - (this.keyboardState.backward ? 1 : 0),
+    };
+  }
+
   public dispose(): void {
     this.container.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
