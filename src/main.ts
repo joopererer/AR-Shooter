@@ -790,15 +790,31 @@ class ArShooterGame {
     activeCam.getWorldPosition(this.tempCamPos);
 
     if (cfg.isRetroLightGun) {
-      // 1. 光线枪 CRT 50ms 白屏瞬间闪烁
-      this.crtFlashEl.classList.remove('hidden');
-      setTimeout(() => this.crtFlashEl.classList.add('hidden'), 50);
+      // 开火按钮触感后坐力动效 (每次点击必触发，杜绝点击无反应假象)
+      this.fireBtnEl.classList.remove('fire-kick');
+      void this.fireBtnEl.offsetWidth;
+      this.fireBtnEl.classList.add('fire-kick');
+      setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
 
-      if (navigator.vibrate) navigator.vibrate(40);
-
-      // 2. 射向打鸭子引擎
       this.raycaster.setFromCamera(this.centerNdc, activeCam);
-      this.duckHuntEngine.shoot(this.raycaster);
+      const res = this.duckHuntEngine.shoot(this.raycaster);
+
+      if (res.fired) {
+        // 1. 光线枪 CRT 50ms 白屏瞬间闪烁
+        this.crtFlashEl.classList.remove('hidden');
+        setTimeout(() => this.crtFlashEl.classList.add('hidden'), 50);
+
+        if (navigator.vibrate) navigator.vibrate(40);
+      } else {
+        // 空弹或未到射击时机的明确声效与文字反馈
+        this.audioManager.playDryFire();
+        if (res.reason === 'no_ammo') {
+          this.showHitPopup('🚫 3发子弹已用尽！', true, 'blocked-hint');
+          if (navigator.vibrate) navigator.vibrate([20, 30]);
+        } else if (res.reason === 'waiting') {
+          this.showHitPopup('⏳ 等待目标就绪...', false, 'blocked-hint');
+        }
+      }
       return;
     }
 
@@ -1329,11 +1345,23 @@ class ArShooterGame {
 
     const cfg = this.modeManager.getModeConfig();
     if (cfg.isRetroLightGun) {
-      // 打鸭子模式下准星保持常态
-      this.crosshairEl.classList.remove('locked', 'friendly-warning', 'blocked');
-      this.lockHintEl.classList.add('hidden');
-      this.friendlyBadgeEl.classList.add('hidden');
-      this.blockedBadgeEl.classList.add('hidden');
+      const activeCam = this.getActiveCamera();
+      this.raycaster.setFromCamera(this.centerNdc, activeCam);
+      const isLocked = this.duckHuntEngine.checkTargetLock(this.raycaster);
+
+      if (isLocked) {
+        this.crosshairEl.classList.add('locked');
+        this.crosshairEl.classList.remove('friendly-warning', 'blocked');
+        this.lockHintEl.classList.remove('hidden');
+        this.lockHintEl.textContent = this.duckHuntEngine.getSubmode() === 'game_c' ? 'CLAY LOCKED' : 'DUCK LOCKED';
+        this.friendlyBadgeEl.classList.add('hidden');
+        this.blockedBadgeEl.classList.add('hidden');
+      } else {
+        this.crosshairEl.classList.remove('locked', 'friendly-warning', 'blocked');
+        this.lockHintEl.classList.add('hidden');
+        this.friendlyBadgeEl.classList.add('hidden');
+        this.blockedBadgeEl.classList.add('hidden');
+      }
       return;
     }
 
@@ -1439,8 +1467,9 @@ class ArShooterGame {
     }
 
     if (cfg.isRetroLightGun) {
-      // 处于 FC 打鸭子模式：禁用歪头探身与摇杆推进
+      // 处于 FC 打鸭子模式：更新打鸭子引擎与准星瞄准锁定状态
       this.duckHuntEngine.update(delta);
+      this.updateSmartReticle();
     } else {
       // 处于 360° AR 沙盒模式
       const rollAngle = this.gyroController.getRollAngle();

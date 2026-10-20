@@ -59,6 +59,12 @@ export interface DuckHuntHUDState {
   isGameOver: boolean;
 }
 
+export interface DuckHuntShootResult {
+  fired: boolean;
+  hit: boolean;
+  reason?: 'no_ammo' | 'waiting';
+}
+
 export class DuckHuntEngine {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -271,7 +277,16 @@ export class DuckHuntEngine {
     this.waveTimer = 0;
     this.isWaveActive = true;
     this.isFlyAway = false;
+
+    // 清除前一波遗留但未彻底移除的物体，彻底杜绝半空悬浮卡死
+    this.activeDucks.forEach((d) => {
+      this.rootGroup.remove(d.meshGroup);
+    });
     this.activeDucks = [];
+
+    this.activeClays.forEach((c) => {
+      this.rootGroup.remove(c.meshGroup);
+    });
     this.activeClays = [];
 
     // 野鸭起飞飞行期间，猎犬必须完全隐藏在草丛下，严禁常驻露面
@@ -384,21 +399,21 @@ export class DuckHuntEngine {
     // 从脚前抛出
     group.position.set(sideOffset * 0.7, -1.2, -3.2);
 
-    // 鲜艳荧光橙色飞盘与微发光核心
-    const clayGeo = new THREE.CylinderGeometry(0.24, 0.27, 0.055, 16);
+    // 鲜艳荧光橙色飞盘与微发光核心 (增大几何体至半径 0.38m 便于远距离识别与瞄准)
+    const clayGeo = new THREE.CylinderGeometry(0.32, 0.38, 0.07, 16);
     const clayMat = new THREE.MeshStandardMaterial({
       color: 0xf97316,
-      roughness: 0.35,
+      roughness: 0.3,
       metalness: 0.15,
       emissive: 0xea580c,
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.45,
     });
     const mesh = new THREE.Mesh(clayGeo, clayMat);
     mesh.rotation.x = Math.PI / 4;
     group.add(mesh);
 
     // 橘白相间条纹顶盖
-    const topStripeGeo = new THREE.CylinderGeometry(0.14, 0.15, 0.065, 16);
+    const topStripeGeo = new THREE.CylinderGeometry(0.18, 0.20, 0.075, 16);
     const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const stripe = new THREE.Mesh(topStripeGeo, stripeMat);
     group.add(stripe);
@@ -410,23 +425,23 @@ export class DuckHuntEngine {
     let gravity: number;
 
     if (this.round <= 2) {
-      // Round 1-2 (入门体验): 慢速、超高优美抛物线、超长滞空时间 (~3.8s)
-      forwardSpd = THREE.MathUtils.randFloat(6.5, 8.0);
-      upSpd = THREE.MathUtils.randFloat(8.8, 10.2);
-      sideSpd = sideOffset * 0.65;
-      gravity = 3.5;
+      // Round 1-2 (入门体验): 极缓飞出、高拱开阔抛物线、超长滞空时间 (~5.0s)，轻松瞄准
+      forwardSpd = THREE.MathUtils.randFloat(3.6, 4.4);
+      upSpd = THREE.MathUtils.randFloat(6.2, 7.4);
+      sideSpd = sideOffset * 0.45;
+      gravity = 2.1;
     } else if (this.round <= 4) {
-      // Round 3-4 (进阶): 稍快、饱满弧线 (~3.0s)
-      forwardSpd = THREE.MathUtils.randFloat(8.2, 10.0);
-      upSpd = THREE.MathUtils.randFloat(8.0, 9.4);
-      sideSpd = sideOffset * 1.0;
-      gravity = 4.0;
+      // Round 3-4 (进阶): 稍快、饱满弧线 (~4.0s)
+      forwardSpd = THREE.MathUtils.randFloat(5.0, 6.2);
+      upSpd = THREE.MathUtils.randFloat(6.8, 8.0);
+      sideSpd = sideOffset * 0.8;
+      gravity = 2.6;
     } else {
-      // Round 5+ (双飞盘进阶挑战): 交叉或相向高速飞行
-      forwardSpd = THREE.MathUtils.randFloat(9.5, 12.0);
-      upSpd = THREE.MathUtils.randFloat(7.0, 8.6);
-      sideSpd = isCrossed ? -sideOffset * 1.6 : sideOffset * 1.3;
-      gravity = 4.6;
+      // Round 5+ (双飞盘进阶挑战): 交叉或相向飞行
+      forwardSpd = THREE.MathUtils.randFloat(6.8, 8.5);
+      upSpd = THREE.MathUtils.randFloat(7.2, 8.5);
+      sideSpd = isCrossed ? -sideOffset * 1.3 : sideOffset * 1.1;
+      gravity = 3.2;
     }
 
     const velocity = new THREE.Vector3(sideSpd, upSpd, -forwardSpd);
@@ -455,9 +470,13 @@ export class DuckHuntEngine {
   // 开火射击判定 (Zapper Light Gun & 3-Shot Limit)
   // ==========================================================================
 
-  public shoot(raycaster: THREE.Raycaster): boolean {
-    if (!this.isWaveActive) return false;
-    if (this.shotsLeft <= 0) return false;
+  public shoot(raycaster: THREE.Raycaster): DuckHuntShootResult {
+    if (!this.isWaveActive) {
+      return { fired: false, hit: false, reason: 'waiting' };
+    }
+    if (this.shotsLeft <= 0) {
+      return { fired: false, hit: false, reason: 'no_ammo' };
+    }
 
     // 扣除 1 发子弹并播放 8-bit 复古光线枪枪声
     this.shotsLeft--;
@@ -465,6 +484,7 @@ export class DuckHuntEngine {
     this.emitHUD();
 
     let didHit = false;
+    const ray = raycaster.ray;
 
     if (this.submode === 'game_c') {
       // 飞盘射击判定
@@ -475,6 +495,7 @@ export class DuckHuntEngine {
         }
       });
 
+      // 1. 精确网格光线碰撞
       const intersects = raycaster.intersectObjects(candidateMeshes, false);
       if (intersects.length > 0) {
         const hitMesh = intersects[0].object as THREE.Mesh;
@@ -482,6 +503,23 @@ export class DuckHuntEngine {
         if (targetClay && targetClay.state === 'flying') {
           this.hitClay(targetClay);
           didHit = true;
+        }
+      }
+
+      // 2. 距离容差判定 (解决飞盘飞远后视角像素过小、移动陀螺仪抖动明明瞄准却无法击中的问题)
+      if (!didHit) {
+        for (const c of this.activeClays) {
+          if (c.state !== 'flying') continue;
+          const toTarget = new THREE.Vector3().subVectors(c.position, ray.origin);
+          if (ray.direction.dot(toTarget) <= 0) continue;
+          const distFromCam = toTarget.length();
+          const distToRay = ray.distanceToPoint(c.position);
+          const hitTolerance = Math.max(0.75, 0.45 + distFromCam * 0.065);
+          if (distToRay <= hitTolerance) {
+            this.hitClay(c);
+            didHit = true;
+            break;
+          }
         }
       }
     } else {
@@ -493,6 +531,7 @@ export class DuckHuntEngine {
         }
       });
 
+      // 1. 精确网格碰撞
       const intersects = raycaster.intersectObjects(candidateMeshes, false);
       if (intersects.length > 0) {
         const hitMesh = intersects[0].object as THREE.Mesh;
@@ -502,6 +541,23 @@ export class DuckHuntEngine {
           didHit = true;
         }
       }
+
+      // 2. 距离容差判定
+      if (!didHit) {
+        for (const d of this.activeDucks) {
+          if (d.state !== 'flying') continue;
+          const toTarget = new THREE.Vector3().subVectors(d.position, ray.origin);
+          if (ray.direction.dot(toTarget) <= 0) continue;
+          const distFromCam = toTarget.length();
+          const distToRay = ray.distanceToPoint(d.position);
+          const hitTolerance = Math.max(0.65, 0.35 + distFromCam * 0.045);
+          if (distToRay <= hitTolerance) {
+            this.hitDuck(d);
+            didHit = true;
+            break;
+          }
+        }
+      }
     }
 
     // 若 3 发子弹用完，且场上仍有未被击落目标，立即触发逃脱
@@ -509,7 +565,56 @@ export class DuckHuntEngine {
       this.checkFlyAwayTrigger();
     }
 
-    return didHit;
+    return { fired: true, hit: didHit };
+  }
+
+  /**
+   * 实时检测当前十字准星是否锁定目标 (变红提示)
+   */
+  public checkTargetLock(raycaster: THREE.Raycaster): boolean {
+    if (!this.isWaveActive || this.isFlyAway) return false;
+
+    const ray = raycaster.ray;
+
+    if (this.submode === 'game_c') {
+      for (const c of this.activeClays) {
+        if (c.state !== 'flying') continue;
+        const toTarget = new THREE.Vector3().subVectors(c.position, ray.origin);
+        if (ray.direction.dot(toTarget) <= 0) continue;
+        const distFromCam = toTarget.length();
+        const distToRay = ray.distanceToPoint(c.position);
+        const lockTolerance = Math.max(0.75, 0.45 + distFromCam * 0.065);
+        if (distToRay <= lockTolerance) {
+          return true;
+        }
+      }
+    } else {
+      for (const d of this.activeDucks) {
+        if (d.state !== 'flying') continue;
+        const toTarget = new THREE.Vector3().subVectors(d.position, ray.origin);
+        if (ray.direction.dot(toTarget) <= 0) continue;
+        const distFromCam = toTarget.length();
+        const distToRay = ray.distanceToPoint(d.position);
+        const lockTolerance = Math.max(0.65, 0.35 + distFromCam * 0.045);
+        if (distToRay <= lockTolerance) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  public getSubmode(): DuckHuntSubmode {
+    return this.submode;
+  }
+
+  public getShotsLeft(): number {
+    return this.shotsLeft;
+  }
+
+  public getIsWaveActive(): boolean {
+    return this.isWaveActive;
   }
 
   /**

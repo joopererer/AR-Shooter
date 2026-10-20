@@ -1981,14 +1981,14 @@ body.duckhunt-active #sound-btn {
 /* 大号开火按钮：置于屏幕右下角 */
 body.duckhunt-active #fire-btn {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right, 16px));
-  bottom: max(10px, env(safe-area-inset-bottom, 10px));
-  pointer-events: auto;
-  z-index: 36;
+  right: max(18px, env(safe-area-inset-right, 18px));
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  pointer-events: auto !important;
+  z-index: 50;
   margin: 0;
 }
 
-/* NES 经典状态栏居中，独立于按键互不遮挡 */
+/* NES 经典状态栏居中，仅作数据展示，禁止拦截触控事件 */
 .nes-hud {
   position: fixed;
   left: 50%;
@@ -2002,8 +2002,8 @@ body.duckhunt-active #fire-btn {
   padding: 8px 14px;
   font-family: 'Courier New', Courier, monospace;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 10px rgba(255, 255, 255, 0.2);
-  z-index: 30;
-  pointer-events: auto;
+  z-index: 25;
+  pointer-events: none !important;
 }
 
 /* 横屏模式下：NES 状态栏沉底居中 (与左侧校准/音效、右侧FIRE并排，留足空隙) */
@@ -2012,15 +2012,17 @@ body.duckhunt-active #fire-btn {
     bottom: max(10px, env(safe-area-inset-bottom, 10px));
     padding: 6px 12px;
     gap: 10px;
-    max-width: 55vw;
+    max-width: 50vw;
+    pointer-events: none !important;
   }
 }
 
-/* 竖屏模式下：NES 状态栏位于底部按钮正上方 (bottom: 84px)，上下错落不重叠 */
+/* 竖屏模式下：NES 状态栏位于底部按钮正上方 (bottom: 114px)，彻底消除与开火按钮重叠 */
 @media (orientation: portrait) {
   body.duckhunt-active .nes-hud {
-    bottom: 84px;
+    bottom: max(114px, calc(env(safe-area-inset-bottom, 16px) + 98px));
     max-width: 95vw;
+    pointer-events: none !important;
   }
 }
 
@@ -2404,17 +2406,18 @@ body.duckhunt-active #fire-btn {
     height: 106px;
   }
 
-  /* 4. FIRE 开火按钮：位于右下操作区 (bottom: 16px)，位于切枪按钮下方 */
-  .fire-btn {
-    pointer-events: auto;
-    position: absolute;
-    right: clamp(36px, 16vw, 130px);
-    transform: translateX(50%);
-    bottom: max(14px, env(safe-area-inset-bottom, 14px));
-    width: 84px;
-    height: 84px;
-    margin: 0;
-    z-index: 25;
+  /* 4. FIRE 开火按钮：位于右下操作区，紧靠右侧安全边距，绝不使用 translateX 导致超出屏幕 */
+  .fire-btn,
+  body.duckhunt-active #fire-btn {
+    pointer-events: auto !important;
+    position: absolute !important;
+    right: max(18px, env(safe-area-inset-right, 18px)) !important;
+    transform: none !important;
+    bottom: max(14px, env(safe-area-inset-bottom, 14px)) !important;
+    width: 84px !important;
+    height: 84px !important;
+    margin: 0 !important;
+    z-index: 50 !important;
   }
 
   .fire-btn-inner {
@@ -2529,6 +2532,8 @@ body.duckhunt-active #fire-btn {
     padding: 4px 12px;
     gap: 10px;
     transform: translateX(-50%) scale(0.92);
+    pointer-events: none !important;
+    max-width: 50vw;
   }
 
   .fly-away-banner {

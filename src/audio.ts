@@ -31,6 +31,31 @@ export class AudioManager {
   }
 
   /**
+   * 空弹/未上膛击发金属撞针清脆咔哒声 (Dry Fire Click)
+   */
+  public playDryFire(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(2600, now);
+      osc.frequency.exponentialRampToValueAtTime(700, now + 0.04);
+
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } catch {}
+  }
+
+  /**
    * 猎鹿步枪 (Rifle) 单发点射激光声 (短促高频滑降)
    */
   public playRifleShot(): void {
