@@ -10,7 +10,10 @@ export type GameMode =
   | 'ghost'
   | 'duckhunt_a'
   | 'duckhunt_b'
-  | 'duckhunt_c';
+  | 'duckhunt_c'
+  | 'gunman_a'
+  | 'gunman_b'
+  | 'gunman_c';
 
 export type ModeCategory = '360_sandbox' | 'retro_lightgun';
 
@@ -24,6 +27,7 @@ export interface ModeConfig {
   description: string;
   isRetroLightGun: boolean;
   duckHuntSubmode?: 'game_a' | 'game_b' | 'game_c';
+  gunmanSubmode?: 'game_a' | 'game_b' | 'game_c';
 }
 
 export class ModeManager {
@@ -93,6 +97,39 @@ export class ModeManager {
       description: '双向抛物线急速远去飞盘，微型靶标高速预判射击',
       isRetroLightGun: true,
       duckHuntSubmode: 'game_c',
+    },
+    gunman_a: {
+      id: 'gunman_a',
+      category: 'retro_lightgun',
+      name: 'FC 荒野大镖客 GAME A: 1 Outlaw',
+      shortName: '大镖客 1匪',
+      icon: '🤠',
+      badge: '1 OUTLAW',
+      description: '单人拔枪决斗！等待 FIRE 信号极限拔枪，提前开火判犯规',
+      isRetroLightGun: true,
+      gunmanSubmode: 'game_a',
+    },
+    gunman_b: {
+      id: 'gunman_b',
+      category: 'retro_lightgun',
+      name: 'FC 荒野大镖客 GAME B: 2 Outlaws',
+      shortName: '大镖客 2匪',
+      icon: '🤠🤠',
+      badge: '2 OUTLAWS',
+      description: '双匪同时拔枪！限定时间内双发连击，考验极限甩枪跟瞄',
+      isRetroLightGun: true,
+      gunmanSubmode: 'game_b',
+    },
+    gunman_c: {
+      id: 'gunman_c',
+      category: 'retro_lightgun',
+      name: 'FC 荒野大镖客 GAME C: Saloon Gang',
+      shortName: '酒馆乱斗 C',
+      icon: '🏚️',
+      badge: 'SALOON GANG',
+      description: '西部酒馆5窗1门匪徒随机探身伏击，空中打爆飞天炸药桶',
+      isRetroLightGun: true,
+      gunmanSubmode: 'game_c',
     },
   };
 

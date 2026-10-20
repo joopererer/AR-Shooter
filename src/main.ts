@@ -17,6 +17,7 @@ import { WeaponManager, WeaponType, WeaponConfig } from './weapons';
 import { ModeManager, GameMode } from './modeManager';
 import { CockpitManager } from './cockpit';
 import { DuckHuntEngine, DuckHuntHUDState } from './duckHunt';
+import { WildGunmanEngine, GunmanHUDState } from './wildGunman';
 
 export type LocomotionMode = 'joystick' | 'webxr' | 'stationary';
 
@@ -158,6 +159,18 @@ class ArShooterGame {
   private nesRetryBtnEl: HTMLElement;
   private nesHubReturnBtnEl: HTMLElement;
 
+  // 荒野大镖客专属 HUD 与特效 DOM
+  private wildGunmanEngine: WildGunmanEngine;
+  private gunmanHudEl: HTMLElement;
+  private gunmanEnemyValEl: HTMLElement;
+  private gunmanPlayerValEl: HTMLElement;
+  private gunmanLivesIconsEl: HTMLElement;
+  private gunmanScoreValEl: HTMLElement;
+  private gunmanFireBannerEl: HTMLElement;
+  private gunmanFoulBannerEl: HTMLElement;
+  private gunmanShatterOverlayEl: HTMLElement;
+  private hubHiGunmanEl: HTMLElement | null = null;
+
   constructor() {
     // 1. 获取核心 HUD DOM 节点
     this.hubBtnEl = document.getElementById('hub-btn')!;
@@ -233,6 +246,17 @@ class ArShooterGame {
     this.nesRetryBtnEl = document.getElementById('nes-retry-btn')!;
     this.nesHubReturnBtnEl = document.getElementById('nes-hub-return-btn')!;
 
+    // 荒野大镖客专属 HUD 与特效 DOM 绑定
+    this.gunmanHudEl = document.getElementById('gunman-hud')!;
+    this.gunmanEnemyValEl = document.getElementById('gunman-enemy-val')!;
+    this.gunmanPlayerValEl = document.getElementById('gunman-player-val')!;
+    this.gunmanLivesIconsEl = document.getElementById('gunman-lives-icons')!;
+    this.gunmanScoreValEl = document.getElementById('gunman-score-val')!;
+    this.gunmanFireBannerEl = document.getElementById('gunman-fire-banner')!;
+    this.gunmanFoulBannerEl = document.getElementById('gunman-foul-banner')!;
+    this.gunmanShatterOverlayEl = document.getElementById('gunman-shatter-overlay')!;
+    this.hubHiGunmanEl = document.getElementById('hub-hi-gunman');
+
     // 全屏按钮与方向受击指示绑定
     this.fullscreenBtnEl = document.getElementById('fullscreen-btn');
     this.fullscreenIconEl = document.getElementById('fullscreen-icon');
@@ -301,6 +325,13 @@ class ArShooterGame {
       onHUDUpdate: (s) => this.updateNesHUD(s),
       onGameOver: (sc, r) => this.handleDuckHuntGameOver(sc, r),
       onRoundClear: (r, b) => this.handleDuckHuntRoundClear(r, b),
+    });
+
+    // 初始化 FC 经典荒野大镖客引擎
+    this.wildGunmanEngine = new WildGunmanEngine(this.scene, this.camera, this.audioManager, {
+      onHUDUpdate: (s) => this.updateGunmanHUD(s),
+      onGameOver: (sc, r) => this.handleGunmanGameOver(sc, r),
+      onRoundClear: (r, b) => this.handleGunmanRoundClear(r, b),
     });
 
     // WebXR 会话管理器
@@ -566,6 +597,11 @@ class ArShooterGame {
     const duckAHi = this.modeManager.getHighScore('duckhunt_a');
     const duckBHi = this.modeManager.getHighScore('duckhunt_b');
     const duckCHi = this.modeManager.getHighScore('duckhunt_c');
+    const gunmanHi = Math.max(
+      this.modeManager.getHighScore('gunman_a'),
+      this.modeManager.getHighScore('gunman_b'),
+      this.modeManager.getHighScore('gunman_c')
+    );
 
     const elH = document.getElementById('hub-hi-hunting');
     if (elH) elH.textContent = huntingHi.toString();
@@ -579,6 +615,9 @@ class ArShooterGame {
     if (elDB) elDB.textContent = duckBHi.toString().padStart(6, '0');
     const elDC = document.getElementById('hub-hi-duckhunt-c');
     if (elDC) elDC.textContent = duckCHi.toString().padStart(6, '0');
+    if (this.hubHiGunmanEl) {
+      this.hubHiGunmanEl.textContent = gunmanHi.toString().padStart(6, '0');
+    }
   }
 
   public launchMode(mode: GameMode): void {
@@ -591,8 +630,6 @@ class ArShooterGame {
     this.gameModeTextEl.textContent = cfg.shortName;
 
     if (cfg.isRetroLightGun) {
-      document.body.classList.add('duckhunt-active');
-
       // 1. 彻底清空 360 沙盒环境与生态实体
       this.environmentManager.clearEnvironment();
       this.entityManager.clearAll();
@@ -616,19 +653,45 @@ class ArShooterGame {
       this.friendlyBadgeEl.classList.add('hidden');
       this.blockedBadgeEl.classList.add('hidden');
 
-      // 3. 激活复古 NES HUD
-      this.nesHudEl.classList.remove('hidden');
+      if (mode.startsWith('gunman_')) {
+        // 激活荒野大镖客专属模式
+        document.body.classList.add('gunman-active');
+        document.body.classList.remove('duckhunt-active');
 
-      // 4. 启动打鸭子引擎
-      this.duckHuntEngine.start(cfg.duckHuntSubmode!);
-      this.showStatusNotification(`进入【${cfg.shortName}】`);
+        this.duckHuntEngine.clear();
+        this.nesHudEl.classList.add('hidden');
+        this.flyAwayBannerEl.classList.add('hidden');
+
+        this.gunmanHudEl.classList.remove('hidden');
+        this.wildGunmanEngine.start(cfg.gunmanSubmode!);
+        this.showStatusNotification(`进入【${cfg.shortName}】`);
+      } else {
+        // 激活 FC 打鸭子模式
+        document.body.classList.add('duckhunt-active');
+        document.body.classList.remove('gunman-active');
+
+        this.wildGunmanEngine.clear();
+        this.gunmanHudEl.classList.add('hidden');
+        this.gunmanFireBannerEl.classList.add('hidden');
+        this.gunmanFoulBannerEl.classList.add('hidden');
+        this.gunmanShatterOverlayEl.classList.add('hidden');
+
+        this.nesHudEl.classList.remove('hidden');
+        this.duckHuntEngine.start(cfg.duckHuntSubmode!);
+        this.showStatusNotification(`进入【${cfg.shortName}】`);
+      }
     } else {
-      document.body.classList.remove('duckhunt-active');
+      document.body.classList.remove('duckhunt-active', 'gunman-active');
 
-      // 1. 彻底清空打鸭子舞台
+      // 1. 彻底清空复古光枪舞台
       this.duckHuntEngine.clear();
+      this.wildGunmanEngine.clear();
       this.nesHudEl.classList.add('hidden');
       this.flyAwayBannerEl.classList.add('hidden');
+      this.gunmanHudEl.classList.add('hidden');
+      this.gunmanFireBannerEl.classList.add('hidden');
+      this.gunmanFoulBannerEl.classList.add('hidden');
+      this.gunmanShatterOverlayEl.classList.add('hidden');
 
       // 2. 恢复 360 度沙盒 HUD 与控制部件
       this.modernStatsWrapperEl?.classList.remove('hidden');
@@ -779,6 +842,72 @@ class ArShooterGame {
   }
 
   // ==========================================================================
+  // 荒野大镖客 (Wild Gunman) HUD 同步与结算回调
+  // ==========================================================================
+
+  private updateGunmanHUD(state: GunmanHUDState): void {
+    if (this.gunmanEnemyValEl) {
+      this.gunmanEnemyValEl.textContent = `${state.enemyTime.toFixed(2)}s`;
+    }
+    if (this.gunmanPlayerValEl) {
+      this.gunmanPlayerValEl.textContent =
+        state.playerTime !== null ? `${state.playerTime.toFixed(2)}s` : '--.--s';
+    }
+
+    if (this.gunmanLivesIconsEl) {
+      const hats = this.gunmanLivesIconsEl.querySelectorAll('.gunman-hat-icon');
+      hats.forEach((h, idx) => {
+        if (idx < state.lives) {
+          h.classList.remove('lost');
+        } else {
+          h.classList.add('lost');
+        }
+      });
+    }
+
+    if (this.gunmanScoreValEl) {
+      this.gunmanScoreValEl.textContent = state.score.toString().padStart(6, '0');
+    }
+
+    // 状态横幅与全屏特效
+    if (state.fireBanner) {
+      this.gunmanFireBannerEl?.classList.remove('hidden');
+    } else {
+      this.gunmanFireBannerEl?.classList.add('hidden');
+    }
+
+    if (state.foulBanner) {
+      this.gunmanFoulBannerEl?.classList.remove('hidden');
+    } else {
+      this.gunmanFoulBannerEl?.classList.add('hidden');
+    }
+
+    if (state.brokenScreen) {
+      this.gunmanShatterOverlayEl?.classList.remove('hidden');
+    } else {
+      this.gunmanShatterOverlayEl?.classList.add('hidden');
+    }
+
+    this.modeManager.updateHighScore(this.modeManager.getMode(), state.score);
+  }
+
+  private handleGunmanGameOver(finalScore: number, roundReached: number): void {
+    const mode = this.modeManager.getMode();
+    this.modeManager.updateHighScore(mode, finalScore);
+    const bestScore = this.modeManager.getHighScore(mode);
+
+    this.nesModalTitleEl.textContent = 'YOU LOST!';
+    this.nesFinalScoreEl.textContent = finalScore.toString().padStart(6, '0');
+    this.nesFinalRoundEl.textContent = roundReached.toString();
+    this.nesFinalBestEl.textContent = bestScore.toString().padStart(6, '0');
+    this.nesGameoverModalEl.classList.remove('hidden');
+  }
+
+  private handleGunmanRoundClear(round: number, bonus: number): void {
+    this.showHitPopup(`ROUND ${round} DRAW WINNER!! +${bonus}`, false, 'duck-perfect-popup');
+  }
+
+  // ==========================================================================
   // 开火射击逻辑
   // ==========================================================================
 
@@ -797,6 +926,23 @@ class ArShooterGame {
       setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
 
       this.raycaster.setFromCamera(this.centerNdc, activeCam);
+
+      // 荒野大镖客专属开火判定
+      if (this.modeManager.getMode().startsWith('gunman_')) {
+        const res = this.wildGunmanEngine.shoot(this.raycaster);
+        if (res.fired) {
+          if (res.reason === 'foul') {
+            this.showHitPopup('⚠️ FOUL!! 提前抢跑犯规！', true, 'blocked-hint');
+          } else {
+            this.crtFlashEl.classList.remove('hidden');
+            setTimeout(() => this.crtFlashEl.classList.add('hidden'), 50);
+            if (navigator.vibrate) navigator.vibrate(45);
+          }
+        }
+        return;
+      }
+
+      // 打鸭子开火判定
       const res = this.duckHuntEngine.shoot(this.raycaster);
 
       if (res.fired) {
@@ -1347,6 +1493,28 @@ class ArShooterGame {
     if (cfg.isRetroLightGun) {
       const activeCam = this.getActiveCamera();
       this.raycaster.setFromCamera(this.centerNdc, activeCam);
+
+      // 荒野大镖客目标锁定判定 (对峙拔枪变红)
+      if (this.modeManager.getMode().startsWith('gunman_')) {
+        const isLocked = this.wildGunmanEngine.checkTargetLock(this.raycaster);
+        if (isLocked) {
+          this.crosshairEl.classList.add('locked');
+          this.crosshairEl.classList.remove('friendly-warning', 'blocked');
+          this.lockHintEl.classList.remove('hidden');
+          this.lockHintEl.textContent =
+            this.wildGunmanEngine.getSubmode() === 'game_c' ? 'BANDIT LOCKED' : 'OUTLAW LOCKED';
+          this.friendlyBadgeEl.classList.add('hidden');
+          this.blockedBadgeEl.classList.add('hidden');
+        } else {
+          this.crosshairEl.classList.remove('locked', 'friendly-warning', 'blocked');
+          this.lockHintEl.classList.add('hidden');
+          this.friendlyBadgeEl.classList.add('hidden');
+          this.blockedBadgeEl.classList.add('hidden');
+        }
+        return;
+      }
+
+      // 打鸭子/飞盘目标锁定判定
       const isLocked = this.duckHuntEngine.checkTargetLock(this.raycaster);
 
       if (isLocked) {
@@ -1451,6 +1619,7 @@ class ArShooterGame {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     this.duckHuntEngine.onResize?.();
+    this.wildGunmanEngine.onResize?.();
   }
 
   /**
@@ -1467,8 +1636,13 @@ class ArShooterGame {
     }
 
     if (cfg.isRetroLightGun) {
-      // 处于 FC 打鸭子模式：更新打鸭子引擎与准星瞄准锁定状态
-      this.duckHuntEngine.update(delta);
+      // 处于复古光枪模式 (打鸭子 / 荒野大镖客)
+      const currentMode = this.modeManager.getMode();
+      if (currentMode.startsWith('gunman_')) {
+        this.wildGunmanEngine.update(delta);
+      } else {
+        this.duckHuntEngine.update(delta);
+      }
       this.updateSmartReticle();
     } else {
       // 处于 360° AR 沙盒模式

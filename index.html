@@ -147,6 +147,24 @@
       <!-- 逃脱警报条 (Duck Hunt FLY AWAY!) -->
       <div id="fly-away-banner" class="fly-away-banner hidden">FLY AWAY!</div>
 
+      <!-- 荒野大镖客 FIRE!! 拔枪警报气泡 -->
+      <div id="gunman-fire-banner" class="gunman-fire-banner hidden">
+        <span class="gunman-fire-text">FIRE!!</span>
+      </div>
+
+      <!-- 荒野大镖客 FOUL!! 犯规抢跑警报横幅 -->
+      <div id="gunman-foul-banner" class="gunman-foul-banner hidden">
+        <span>⚠️ FOUL!! 犯规抢跑!</span>
+      </div>
+
+      <!-- 荒野大镖客 玻璃弹孔碎屏碎裂特效层 -->
+      <div id="gunman-shatter-overlay" class="gunman-shatter-overlay hidden">
+        <div class="shatter-flash"></div>
+        <div class="bullet-hole"></div>
+        <div class="bullet-cracks"></div>
+        <div class="lost-banner">YOU LOST</div>
+      </div>
+
       <!-- 中间操作交互区 (左右两侧，360度模式独占) -->
       <div id="hud-mid-row">
         <!-- 左侧：歪头探身控制器 (Peek Control) -->
@@ -245,6 +263,30 @@
         <div class="nes-hud-section nes-score-box">
           <span class="nes-label white">SCORE</span>
           <span id="nes-score-val" class="nes-val white">000000</span>
+        </div>
+      </div>
+
+      <!-- NES 复古红白机 荒野大镖客 (Wild Gunman) 专属像素 HUD -->
+      <div id="gunman-hud" class="nes-hud gunman-hud hidden">
+        <div class="nes-hud-section gunman-enemy-box">
+          <span class="nes-label red">ENEMY</span>
+          <span id="gunman-enemy-val" class="nes-val red">0.80s</span>
+        </div>
+        <div class="nes-hud-section gunman-player-box">
+          <span class="nes-label blue">YOUR</span>
+          <span id="gunman-player-val" class="nes-val blue">--.--s</span>
+        </div>
+        <div class="nes-hud-section gunman-lives-box">
+          <div class="gunman-lives-icons" id="gunman-lives-icons">
+            <span class="gunman-hat-icon active">🤠</span>
+            <span class="gunman-hat-icon active">🤠</span>
+            <span class="gunman-hat-icon active">🤠</span>
+          </div>
+          <span class="nes-label green">LIVES</span>
+        </div>
+        <div class="nes-hud-section nes-score-box">
+          <span class="nes-label white">SCORE</span>
+          <span id="gunman-score-val" class="nes-val white">000000</span>
         </div>
       </div>
 
@@ -418,10 +460,37 @@
                 <p class="card-desc retro-desc">双向抛物线急速远去，飞盘远距离透视缩小，极限预判</p>
                 <button class="hub-launch-btn retro-launch-btn duck-submode-btn" data-mode="duckhunt_c">开始街机</button>
               </div>
+
+              <!-- 🤠 荒野大镖客 (Wild Gunman 1984) -->
+              <div class="hub-card hub-carousel-card retro-game-card gunman-hub-card" data-mode="gunman_a">
+                <div class="hub-card-top">
+                  <span class="card-icon">🤠</span>
+                  <span class="card-badge gunman-badge">WILD GUNMAN</span>
+                  <span class="card-hi retro-hi">HI: <strong id="hub-hi-gunman">000000</strong></span>
+                </div>
+                <h4 class="card-title retro-title">荒野大镖客</h4>
+                <p class="card-subtitle retro-subtitle">Wild Gunman 1984</p>
+                <p class="card-desc retro-desc">西部对峙拔枪决斗！紧盯 FIRE 信号极限拔枪，提前开火判 FOUL!! 犯规！</p>
+                <div class="gunman-submodes-row">
+                  <button class="hub-launch-btn retro-launch-btn gunman-submode-btn" data-mode="gunman_a">
+                    <span class="submode-tag">GAME A</span>
+                    <span class="submode-label">1 Outlaw (单人决斗)</span>
+                  </button>
+                  <button class="hub-launch-btn retro-launch-btn gunman-submode-btn" data-mode="gunman_b">
+                    <span class="submode-tag">GAME B</span>
+                    <span class="submode-label">2 Outlaws (双匪决斗)</span>
+                  </button>
+                  <button class="hub-launch-btn retro-launch-btn gunman-submode-btn" data-mode="gunman_c">
+                    <span class="submode-tag">GAME C</span>
+                    <span class="submode-label">Saloon (酒馆乱斗)</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="carousel-dots" id="dots-retro">
               <span class="dot active"></span>
+              <span class="dot"></span>
               <span class="dot"></span>
               <span class="dot"></span>
             </div>

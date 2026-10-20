@@ -2017,9 +2017,10 @@ body.duckhunt-active #fire-btn {
   }
 }
 
-/* 竖屏模式下：NES 状态栏位于底部按钮正上方 (bottom: 114px)，彻底消除与开火按钮重叠 */
+/* 竖屏模式下：NES / 荒野大镖客 状态栏位于底部按钮正上方 (bottom: 114px)，彻底消除与开火按钮重叠 */
 @media (orientation: portrait) {
-  body.duckhunt-active .nes-hud {
+  body.duckhunt-active .nes-hud,
+  body.gunman-active .gunman-hud {
     bottom: max(114px, calc(env(safe-area-inset-bottom, 16px) + 98px));
     max-width: 95vw;
     pointer-events: none !important;
@@ -2268,6 +2269,219 @@ body.duckhunt-active #fire-btn {
 
 .nes-hub-btn:hover {
   background: #374151;
+}
+
+/* ==========================================================================
+   【🤠 荒野大镖客 (Wild Gunman 1984)】专属复古西部样式系统
+   ========================================================================== */
+
+/* 大厅卡片与子模式按钮 */
+.gunman-badge {
+  background: #78350f !important;
+  border-color: #f59e0b !important;
+  color: #fef3c7 !important;
+}
+
+.gunman-hub-card {
+  border-color: #b45309 !important;
+  background: radial-gradient(circle at 50% 0%, rgba(180, 83, 9, 0.22) 0%, rgba(10, 15, 26, 0.95) 75%) !important;
+}
+
+.gunman-submodes-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.gunman-submode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #111827;
+  border: 1.5px solid #d97706;
+  border-radius: 4px;
+  color: #fef3c7;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gunman-submode-btn:hover,
+.gunman-submode-btn:active {
+  background: #b45309;
+  border-color: #fde68a;
+  color: #ffffff;
+  transform: scale(0.98);
+}
+
+.submode-tag {
+  background: #d97706;
+  color: #000000;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.submode-label {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+/* 激活状态下开火按钮置于右下角 */
+body.gunman-active #fire-btn {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right, 18px));
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  pointer-events: auto !important;
+  z-index: 50;
+  margin: 0;
+}
+
+/* 荒野大镖客专属 HUD */
+.gunman-hud {
+  border-color: #d97706 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95), 0 0 14px rgba(217, 119, 6, 0.35) !important;
+}
+
+.nes-label.red {
+  color: #ef4444;
+}
+
+.nes-val.red {
+  color: #ef4444;
+}
+
+.gunman-lives-icons {
+  display: flex;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.gunman-hat-icon {
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.gunman-hat-icon.lost {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+
+/* 拔枪信号 (FIRE!!) 经典气泡 */
+.gunman-fire-banner {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000000;
+  border: 4px solid #facc15;
+  color: #facc15;
+  padding: 6px 24px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.85);
+  animation: gunman-fire-pulse 0.18s infinite alternate;
+  z-index: 35;
+  pointer-events: none;
+}
+
+@keyframes gunman-fire-pulse {
+  0% { transform: translateX(-50%) scale(0.96); box-shadow: 0 0 15px rgba(250, 204, 21, 0.5); }
+  100% { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 35px rgba(250, 204, 21, 1.0); }
+}
+
+/* 犯规抢跑警报 (FOUL!!) */
+.gunman-foul-banner {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #000000;
+  border: 4px solid #ef4444;
+  color: #ef4444;
+  padding: 6px 20px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  border-radius: 6px;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.85);
+  animation: nes-slot-blink 0.25s infinite alternate;
+  z-index: 35;
+  pointer-events: none;
+}
+
+/* 碎屏与玻璃弹孔裂纹特效层 (Bullet Hole & Glass Shatter) */
+.gunman-shatter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.shatter-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(185, 28, 28, 0.85) 100%);
+  animation: hit-flash-anim 0.4s forwards ease-out;
+}
+
+/* 屏幕中央弹孔与放射状蛛网裂纹 */
+.bullet-hole {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #000000 35%, #450a0a 70%, #991b1b 100%);
+  box-shadow: 0 0 12px #000000, inset 0 0 6px #000000;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  z-index: 92;
+}
+
+.bullet-cracks {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  background-image: 
+    radial-gradient(circle, transparent 20%, rgba(255, 255, 255, 0.3) 22%, transparent 24%),
+    radial-gradient(circle, transparent 45%, rgba(255, 255, 255, 0.25) 47%, transparent 49%),
+    linear-gradient(45deg, transparent 49.5%, rgba(255, 255, 255, 0.6) 50%, transparent 50.5%),
+    linear-gradient(-45deg, transparent 49.5%, rgba(255, 255, 255, 0.6) 50%, transparent 50.5%),
+    linear-gradient(15deg, transparent 49.5%, rgba(255, 255, 255, 0.5) 50%, transparent 50.5%),
+    linear-gradient(75deg, transparent 49.5%, rgba(255, 255, 255, 0.5) 50%, transparent 50.5%),
+    linear-gradient(105deg, transparent 49.5%, rgba(255, 255, 255, 0.5) 50%, transparent 50.5%),
+    linear-gradient(165deg, transparent 49.5%, rgba(255, 255, 255, 0.5) 50%, transparent 50.5%);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+  z-index: 91;
+}
+
+.lost-banner {
+  position: absolute;
+  bottom: 24%;
+  background: #000000;
+  border: 3px solid #ef4444;
+  color: #ef4444;
+  padding: 8px 24px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  border-radius: 4px;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+  z-index: 93;
+  animation: nes-slot-blink 0.3s infinite alternate;
 }
 
 /* ==========================================================================
@@ -2527,18 +2741,21 @@ body.duckhunt-active #fire-btn {
     gap: 8px;
   }
 
-  .nes-hud {
+  .nes-hud,
+  .gunman-hud {
     bottom: max(8px, env(safe-area-inset-bottom, 8px));
     padding: 4px 12px;
     gap: 10px;
     transform: translateX(-50%) scale(0.92);
     pointer-events: none !important;
-    max-width: 50vw;
+    max-width: 52vw;
   }
 
-  .fly-away-banner {
+  .fly-away-banner,
+  .gunman-fire-banner,
+  .gunman-foul-banner {
     top: 48px;
-    font-size: 16px;
-    padding: 4px 12px;
+    font-size: 18px;
+    padding: 4px 14px;
   }
 }

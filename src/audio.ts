@@ -775,5 +775,316 @@ export class AudioManager {
       });
     } catch {}
   }
+
+  // ==========================================================================
+  // 【🤠 荒野大镖客 (Wild Gunman 1984)】8-Bit 复古西部音效合成系统
+  // ==========================================================================
+
+  /**
+   * 荒野大镖客开场/对峙 经典西部口哨与大调旋律 (Standoff Whistle Theme)
+   */
+  public playGunmanIntro(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      // 经典《Wild Gunman》决斗出场旋律: D4 -> G4 -> B4 -> D5 -> C5 -> B4 -> A4 -> G4
+      const notes = [
+        { f: 587.33, d: 0.12, type: 'sine' },      // D5
+        { f: 783.99, d: 0.14, type: 'sine' },      // G5
+        { f: 987.77, d: 0.16, type: 'sine' },      // B5
+        { f: 1174.66, d: 0.28, type: 'sine' },     // D6 (高亢口哨延长)
+        { f: 1046.50, d: 0.12, type: 'triangle' }, // C6
+        { f: 987.77, d: 0.14, type: 'triangle' },  // B5
+        { f: 880.00, d: 0.16, type: 'triangle' },  // A5
+        { f: 783.99, d: 0.38, type: 'square' },    // G5 (收尾复古方波)
+      ];
+      let t = this.ctx.currentTime + 0.05;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = n.type as OscillatorType;
+        osc.frequency.setValueAtTime(n.f, t);
+
+        gain.gain.setValueAtTime(0.24, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d + 0.03;
+      });
+    } catch {}
+  }
+
+  /**
+   * 荒野风吹沙砾环境音 (Desert Wind & Sand Drift)
+   */
+  public playWesternWind(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const bufferSize = this.ctx.sampleRate * 1.5;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.08;
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(420, this.ctx.currentTime);
+      filter.frequency.linearRampToValueAtTime(860, this.ctx.currentTime + 0.7);
+      filter.frequency.linearRampToValueAtTime(380, this.ctx.currentTime + 1.5);
+      filter.Q.value = 3.5;
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.5);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      noise.start();
+      noise.stop(this.ctx.currentTime + 1.5);
+    } catch {}
+  }
+
+  /**
+   * FIRE!! 信号瞬间爆响标志性高亢双音口哨 (Draw! Urgent Whistle)
+   */
+  public playGunmanFireCall(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 双频率急促并响口哨 (1480Hz + 2220Hz 强烈警示)
+      [1480, 2220].forEach((freq) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.25, now + 0.12);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      });
+    } catch {}
+  }
+
+  /**
+   * 单发左轮手枪轰鸣声 (Single-Action Revolver Blast)
+   * 包含击锤金属撞击 + 爆炸低音冲击 + 机械回响
+   */
+  public playRevolverShot(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+
+      // 1. 金属击锤咔嗒脆音 (Hammer Snap)
+      const hammer = this.ctx.createOscillator();
+      const hammerGain = this.ctx.createGain();
+      hammer.type = 'triangle';
+      hammer.frequency.setValueAtTime(3200, now);
+      hammer.frequency.exponentialRampToValueAtTime(800, now + 0.025);
+      hammerGain.gain.setValueAtTime(0.4, now);
+      hammerGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+      hammer.connect(hammerGain);
+      hammerGain.connect(this.ctx.destination);
+      hammer.start(now);
+      hammer.stop(now + 0.035);
+
+      // 2. 左轮黑火药重击音 (Powder Blast)
+      const blast = this.ctx.createOscillator();
+      const blastGain = this.ctx.createGain();
+      blast.type = 'sawtooth';
+      blast.frequency.setValueAtTime(380, now + 0.01);
+      blast.frequency.exponentialRampToValueAtTime(45, now + 0.32);
+      blastGain.gain.setValueAtTime(0.55, now + 0.01);
+      blastGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      blast.connect(blastGain);
+      blastGain.connect(this.ctx.destination);
+      blast.start(now + 0.01);
+      blast.stop(now + 0.33);
+
+      // 3. 枪口白噪声爆裂
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.45, now + 0.01);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      noise.connect(noiseGain);
+      noiseGain.connect(this.ctx.destination);
+      noise.start(now + 0.01);
+    } catch {}
+  }
+
+  /**
+   * 碎屏与玻璃弹孔裂纹撕裂音 (Glass Bullet Hole Shatter)
+   */
+  public playGlassShatter(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 高频爆破撕裂脆响
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.4);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (i % 20 < 4 ? 0.9 : 0.3) * Math.exp(-i / (bufferSize * 0.4));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(2800, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.65, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+
+      // 低音中弹闷击
+      const thud = this.ctx.createOscillator();
+      const thudGain = this.ctx.createGain();
+      thud.type = 'triangle';
+      thud.frequency.setValueAtTime(140, now);
+      thud.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+      thudGain.gain.setValueAtTime(0.4, now);
+      thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      thud.connect(thudGain);
+      thudGain.connect(this.ctx.destination);
+      thud.start(now);
+      thud.stop(now + 0.26);
+    } catch {}
+  }
+
+  /**
+   * 犯规抢跑警报音 (FOUL!! Buzzer)
+   */
+  public playGunmanFoul(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.setValueAtTime(120, now + 0.12);
+
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.36);
+    } catch {}
+  }
+
+  /**
+   * 决斗胜利短旋律 (Quick-Draw Victory Flourish)
+   */
+  public playGunmanWinFanfare(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const notes = [
+        { f: 659.25, d: 0.08 }, // E5
+        { f: 783.99, d: 0.08 }, // G5
+        { f: 987.77, d: 0.08 }, // B5
+        { f: 1318.51, d: 0.32 }, // E6 (高亢清脆决斗胜利)
+      ];
+      let t = this.ctx.currentTime;
+      notes.forEach((n) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(n.f, t);
+        gain.gain.setValueAtTime(0.28, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + n.d + 0.01);
+        t += n.d;
+      });
+    } catch {}
+  }
+
+  /**
+   * 酒馆百叶木门/窗户推开吱呀声 (Saloon Door Creak)
+   */
+  public playSaloonOpen(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(320, now + 0.16);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.19);
+    } catch {}
+  }
+
+  /**
+   * 炸药桶空中引信火花与爆炸音 (Dynamite Explosion)
+   */
+  public playDynamiteExplosion(): void {
+    if (!this.isEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.6);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.28));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, now);
+      filter.frequency.exponentialRampToValueAtTime(120, now + 0.55);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.7, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+    } catch {}
+  }
 }
 
