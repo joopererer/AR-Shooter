@@ -449,11 +449,22 @@ class ArShooterGame {
       this.openGameHub();
     });
 
-    // 开火按钮
-    this.fireBtnEl.addEventListener('pointerdown', (e) => {
+    // 开火按钮多事件全兼容监听 (Pointer, Touch, Click 全响应 + 60ms 极速防抖)
+    let lastFireTrigger = 0;
+    const onFireButtonAction = (e: Event) => {
       e.stopPropagation();
+      if (e.cancelable && e.type === 'touchstart') {
+        e.preventDefault();
+      }
+      const now = performance.now();
+      if (now - lastFireTrigger < 60) return;
+      lastFireTrigger = now;
       this.triggerFire();
-    });
+    };
+
+    this.fireBtnEl.addEventListener('pointerdown', onFireButtonAction);
+    this.fireBtnEl.addEventListener('touchstart', onFireButtonAction, { passive: false });
+    this.fireBtnEl.addEventListener('click', onFireButtonAction);
 
     // 屏幕触摸/点击快速开火 (避开 HUD 控制区)
     window.addEventListener('pointerdown', (e) => {
@@ -623,6 +634,7 @@ class ArShooterGame {
   public launchMode(mode: GameMode): void {
     this.closeGameHub();
     this.nesGameoverModalEl.classList.add('hidden');
+    this.isGameRunning = true;
     this.modeManager.setMode(mode);
     const cfg = this.modeManager.getModeConfig(mode);
 
@@ -912,19 +924,21 @@ class ArShooterGame {
   // ==========================================================================
 
   private triggerFire(): void {
-    if (!this.isGameRunning) return;
+    if (!this.isGameRunning) {
+      this.isGameRunning = true;
+    }
+
+    // 开火按钮触感后坐力动效 (每次点击必触发，杜绝点击无反应假象)
+    this.fireBtnEl.classList.remove('fire-kick');
+    void this.fireBtnEl.offsetWidth;
+    this.fireBtnEl.classList.add('fire-kick');
+    setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
 
     const cfg = this.modeManager.getModeConfig();
     const activeCam = this.getActiveCamera();
     activeCam.getWorldPosition(this.tempCamPos);
 
     if (cfg.isRetroLightGun) {
-      // 开火按钮触感后坐力动效 (每次点击必触发，杜绝点击无反应假象)
-      this.fireBtnEl.classList.remove('fire-kick');
-      void this.fireBtnEl.offsetWidth;
-      this.fireBtnEl.classList.add('fire-kick');
-      setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
-
       this.raycaster.setFromCamera(this.centerNdc, activeCam);
 
       // 荒野大镖客专属开火判定
@@ -969,10 +983,6 @@ class ArShooterGame {
       this.showHitPopup('⏳ 换弹/冷却中...', true, 'blocked-hint');
       return;
     }
-
-    // 开火按钮触感后坐力动效
-    this.fireBtnEl.classList.add('fire-kick');
-    setTimeout(() => this.fireBtnEl.classList.remove('fire-kick'), 120);
 
     const currentWeapon = this.weaponManager.getCurrentConfig();
 

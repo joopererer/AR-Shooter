@@ -1675,6 +1675,39 @@ export class EntityManager {
         return curr.userData.gameEntity as GameEntity;
       }
     }
+
+    // 2. 远距离体感瞄准容差辅助判定 (针对 7m~14m 动物生灵提供体感射击判定)
+    const ray = raycaster.ray;
+    let closestEntity: GameEntity | null = null;
+    let closestDist = Infinity;
+
+    for (const ent of active) {
+      // 获取实体当前中心在世界坐标下的估算位置
+      const targetPos = ent.position.clone();
+      if (ent.headMesh) {
+        targetPos.y += 0.5;
+      }
+
+      const toEnt = new THREE.Vector3().subVectors(targetPos, ray.origin);
+      if (ray.direction.dot(toEnt) <= 0) continue; // 处于视线背后
+
+      const distFromCam = toEnt.length();
+      const distToRay = ray.distanceToPoint(targetPos);
+
+      // 根据物种体型与距玩家距离动态缩放容差
+      const baseRadius = ent.type === 'bear' ? 1.5 : (ent.type === 'cow' || ent.type === 'boar' ? 1.25 : ent.type === 'deer' ? 1.15 : 0.9);
+      const tolerance = baseRadius + distFromCam * 0.05;
+
+      if (distToRay <= tolerance && distFromCam < closestDist) {
+        closestDist = distFromCam;
+        closestEntity = ent;
+      }
+    }
+
+    if (closestEntity) {
+      return closestEntity;
+    }
+
     return null;
   }
 

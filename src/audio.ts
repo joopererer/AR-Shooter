@@ -12,14 +12,18 @@ export class AudioManager {
     // 延迟初始化，在用户点击首个手势时激活
   }
 
-  public init(): void {
+  private ensureContext(): void {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
     }
+  }
+
+  public init(): void {
+    this.ensureContext();
   }
 
   public setEnabled(enabled: boolean): void {
@@ -34,6 +38,7 @@ export class AudioManager {
    * 空弹/未上膛击发金属撞针清脆咔哒声 (Dry Fire Click)
    */
   public playDryFire(): void {
+    this.ensureContext();
     if (!this.isEnabled || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;
@@ -59,6 +64,7 @@ export class AudioManager {
    * 猎鹿步枪 (Rifle) 单发点射激光声 (短促高频滑降)
    */
   public playRifleShot(): void {
+    this.ensureContext();
     if (!this.isEnabled || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;
@@ -84,6 +90,7 @@ export class AudioManager {
    * 重型霰弹枪 (Shotgun) 轰鸣爆发音 (低频爆鸣 + 白噪声瞬态)
    */
   public playShotgunShot(): void {
+    this.ensureContext();
     if (!this.isEnabled || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;
@@ -131,6 +138,7 @@ export class AudioManager {
    * 穿甲狙击枪 (Sniper) 贯穿音 (高频电磁充能 + 破空尖啸)
    */
   public playSniperShot(): void {
+    this.ensureContext();
     if (!this.isEnabled || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;

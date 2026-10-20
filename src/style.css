@@ -992,6 +992,14 @@ body {
   color: #fff;
   font-weight: 900;
   margin-top: -16px;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  z-index: 50;
+  cursor: pointer;
+}
+
+.fire-btn * {
+  pointer-events: none !important;
 }
 
 .fire-btn-inner {
